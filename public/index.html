@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Stock FEFO Pro</title>
+
+<style>
+
+*{
+box-sizing:border-box;
+font-family:Arial,sans-serif;
+}
+
+body{
+margin:0;
+background:#f1f5f9;
+}
+
+
+#login{
+height:100vh;
+display:flex;
+justify-content:center;
+align-items:center;
+}
+
+
+.box{
+background:white;
+padding:25px;
+width:90%;
+max-width:350px;
+border-radius:15px;
+box-shadow:0 5px 15px #0003;
+}
+
+
+input,button{
+
+width:100%;
+padding:12px;
+margin:7px 0;
+border-radius:8px;
+border:1px solid #ccc;
+
+}
+
+
+button{
+
+background:#2563eb;
+color:white;
+border:none;
+font-weight:bold;
+
+}
+
+
+#app{
+
+display:none;
+
+}
+
+
+header{
+
+background:#0f172a;
+color:white;
+padding:15px;
+
+}
+
+
+nav{
+
+display:flex;
+gap:8px;
+padding:10px;
+background:white;
+overflow:auto;
+
+}
+
+
+nav button{
+
+min-width:120px;
+
+}
+
+
+.page{
+
+padding:15px;
+
+}
+
+
+.card{
+
+background:white;
+padding:20px;
+border-radius:12px;
+margin-bottom:15px;
+
+}
+
+
+table{
+
+width:100%;
+border-collapse:collapse;
+background:white;
+
+}
+
+
+td,th{
+
+padding:10px;
+border:1px solid #ddd;
+
+}
+
+</style>
+
+
+</head>
+
+
+<body>
+
+
+<div id="login">
+
+<div class="box">
+
+<h2>📦 Stock FEFO Pro</h2>
+
+
+<input id="user" placeholder="Utilisateur">
+
+
+<input id="pass" type="password" placeholder="Mot de passe">
+
+
+<button onclick="connexion()">
+Connexion
+</button>
+
+
+</div>
+
+</div>
+
+
+
+<div id="app">
+
+
+<header>
+
+<h2>Stock FEFO Pro</h2>
+
+</header>
+
+
+
+<nav>
+
+<button onclick="ouvrir('dashboard')">
+📊 Dashboard
+</button>
+
+
+<button onclick="ouvrir('produits')">
+📦 Produits
+</button>
+
+
+<button onclick="ouvrir('entrees')">
+📥 Entrées
+</button>
+
+
+</nav>
+
+
+
+<div id="dashboard" class="page">
+
+<div class="card">
+
+<h3>Total produits</h3>
+
+<h1 id="total">0</h1>
+
+</div>
+
+
+</div>
+
+
+
+<div id="produits" class="page" style="display:none">
+
+
+<h2>Produits</h2>
+
+
+<table>
+
+<tr>
+
+<th>Nom</th>
+
+<th>Date</th>
+
+</tr>
+
+
+<tbody id="liste">
+
+</tbody>
+
+
+</table>
+
+
+</div>
+
+
+
+<div id="entrees" class="page" style="display:none">
+
+
+<h2>Entrée stock</h2>
+
+
+<p>Module à venir</p>
+
+
+</div>
+
+
+</div>
+
+<script>
+
+let headers = {};
+
+
+// CONNEXION
+
+async function connexion(){
+
+let u = document.getElementById("user").value;
+let p = document.getElementById("pass").value;
+
+
+headers = {
+
+"Authorization":"Basic " + btoa(u + ":" + p)
+
+};
+
+
+
+let test = await fetch("/stats",{
+
+headers:headers
+
+});
+
+
+
+if(test.status === 401){
+
+alert("Identifiants incorrects");
+
+return;
+
+}
+
+
+
+document.getElementById("login").style.display="none";
+
+document.getElementById("app").style.display="block";
+
+
+charger();
+
+
+}
+
+
+
+// NAVIGATION
+
+function ouvrir(page){
+
+
+document.querySelectorAll(".page").forEach(x=>{
+
+x.style.display="none";
+
+});
+
+
+document.getElementById(page).style.display="block";
+
+
+}
+
+
+
+// CHARGER PRODUITS
+
+async function charger(){
+
+
+let res = await fetch("/produits",{
+
+headers:headers
+
+});
+
+
+let produits = await res.json();
+
+
+
+document.getElementById("total").innerText = produits.length;
+
+
+
+let html="";
+
+
+produits.forEach(p=>{
+
+
+html += `
+
+<tr>
+
+<td>${p.nom}</td>
+
+<td>${p.dateExpiration || "-"}</td>
+
+</tr>
+
+`;
+
+
+});
+
+
+document.getElementById("liste").innerHTML=html;
+
+
+}
+
+// MODULE ENTREE STOCK
+
+document.getElementById("entrees").innerHTML = `
+
+<h2>📥 Entrée stock</h2>
+
+<input id="nomProduit" placeholder="Nom du produit">
+
+<input id="codeProduit" placeholder="Code-barres">
+
+<input id="quantite" type="number" placeholder="Quantité">
+
+<input id="dateExpiration" type="date">
+
+<input id="emplacement" placeholder="Emplacement">
+
+<button onclick="ajouterProduit()">
+➕ Ajouter au stock
+</button>
+
+`;
+
+
+
+async function ajouterProduit(){
+
+
+let produit = {
+
+nom: document.getElementById("nomProduit").value,
+
+codeBarres: document.getElementById("codeProduit").value,
+
+quantite: Number(document.getElementById("quantite").value),
+
+dateExpiration: document.getElementById("dateExpiration").value,
+
+emplacement: document.getElementById("emplacement").value
+
+};
+
+
+
+let res = await fetch("/produits",{
+
+method:"POST",
+
+headers:{
+
+"Content-Type":"application/json",
+
+...headers
+
+},
+
+body:JSON.stringify(produit)
+
+});
+
+
+
+if(res.ok){
+
+alert("Produit ajouté avec succès");
+
+charger();
+verifierFEFO();
+}
+
+
+
+// ANALYSE FEFO
+
+async function verifierFEFO(){
+
+
+let res = await fetch("/produits",{
+
+headers:headers
+
+});
+
+
+let produits = await res.json();
+
+
+
+let aujourd = new Date();
+
+let alertes = [];
+
+
+
+produits.forEach(p=>{
+
+
+if(p.dateExpiration){
+
+
+let date = new Date(p.dateExpiration);
+
+
+let jours = (date - aujourd) /
+(1000*60*60*24);
+
+
+
+if(jours <= 30 && jours >= 0){
+
+alertes.push(
+p.nom + " expire bientôt"
+);
+
+}
+
+
+if(jours < 0){
+
+alertes.push(
+p.nom + " est expiré"
+);
+
+}
+
+
+}
+
+
+});
+
+
+
+if(alertes.length > 0){
+
+console.log("⚠️ ALERTES FEFO");
+
+console.log(alertes.join("\n"));
+
+}
+
+
+}}// SORTIE PRODUIT
+
+async function sortirProduit(id){
+
+
+let confirmation = confirm(
+"Confirmer la sortie de ce produit ?"
+);
+
+
+if(!confirmation){
+return;
+}
+
+
+
+let res = await fetch("/produits/"+id,{
+
+method:"DELETE",
+
+headers:headers
+
+});
+
+
+
+if(res.ok){
+
+alert("Produit sorti du stock");
+
+charger();
+
+}
+
+
+}
+</script>
+</body>
+
+</html>

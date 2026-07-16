@@ -1,0 +1,12 @@
+{
+  "produits": [
+    {
+      "id": "1784231150709",
+      "nom": "Sac à main ",
+      "codeBarres": "4yuikkhg45678",
+      "emplacement": "Yyy",
+      "dateExpiration": "2026-07-16"
+    }
+  ],
+  "history": []
+}
