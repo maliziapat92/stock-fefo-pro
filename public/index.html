@@ -1,550 +1,87 @@
 <!DOCTYPE html>
 <html lang="fr">
-
 <head>
-
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<title>Stock FEFO Pro</title>
-
-<style>
-
-*{
-box-sizing:border-box;
-font-family:Arial,sans-serif;
-}
-
-body{
-margin:0;
-background:#f1f5f9;
-}
-
-
-#login{
-height:100vh;
-display:flex;
-justify-content:center;
-align-items:center;
-}
-
-
-.box{
-background:white;
-padding:25px;
-width:90%;
-max-width:350px;
-border-radius:15px;
-box-shadow:0 5px 15px #0003;
-}
-
-
-input,button{
-
-width:100%;
-padding:12px;
-margin:7px 0;
-border-radius:8px;
-border:1px solid #ccc;
-
-}
-
-
-button{
-
-background:#2563eb;
-color:white;
-border:none;
-font-weight:bold;
-
-}
-
-
-#app{
-
-display:none;
-
-}
-
-
-header{
-
-background:#0f172a;
-color:white;
-padding:15px;
-
-}
-
-
-nav{
-
-display:flex;
-gap:8px;
-padding:10px;
-background:white;
-overflow:auto;
-
-}
-
-
-nav button{
-
-min-width:120px;
-
-}
-
-
-.page{
-
-padding:15px;
-
-}
-
-
-.card{
-
-background:white;
-padding:20px;
-border-radius:12px;
-margin-bottom:15px;
-
-}
-
-
-table{
-
-width:100%;
-border-collapse:collapse;
-background:white;
-
-}
-
-
-td,th{
-
-padding:10px;
-border:1px solid #ddd;
-
-}
-
-</style>
-
-
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FEFO 📦</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f9; }
+        h1 { text-align: center; }
+        .subtitle { text-align: center; color: #7f8c8d; margin-bottom: 20px; }
+        form { background: #fff; padding: 15px; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        input, button { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { background-color: #27ae60; color: white; cursor: pointer; font-weight: bold; }
+        .btn-scan { background-color: #e74c3c; }
+        table { width: 100%; border-collapse: collapse; background: white; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #2980b9; color: white; }
+        .btn-delete { background-color: #e74c3c; color: white; border: none; padding: 5px 10px; cursor: pointer; }
+    </style>
 </head>
-
-
 <body>
 
-
-<div id="login">
-
-<div class="box">
-
-<h2>📦 Stock FEFO Pro</h2>
-
-
-<input id="user" placeholder="Utilisateur">
-
-
-<input id="pass" type="password" placeholder="Mot de passe">
-
-
-<button onclick="connexion()">
-Connexion
-</button>
-
-
-</div>
-
-</div>
-
-
-
-<div id="app">
-
-
-<header>
-
-<h2>Stock FEFO Pro</h2>
-
-</header>
-
-
-
-<nav>
-
-<button onclick="ouvrir('dashboard')">
-📊 Dashboard
-</button>
-
-
-<button onclick="ouvrir('produits')">
-📦 Produits
-</button>
-
-
-<button onclick="ouvrir('entrees')">
-📥 Entrées
-</button>
-
-
-</nav>
-
-
-
-<div id="dashboard" class="page">
-
-<div class="card">
-
-<h3>Total produits</h3>
-
-<h1 id="total">0</h1>
-
-</div>
-
-
-</div>
-
-
-
-<div id="produits" class="page" style="display:none">
-
-
-<h2>Produits</h2>
-
-
-<table>
-
-<tr>
-
-<th>Nom</th>
-
-<th>Date</th>
-
-</tr>
-
-
-<tbody id="liste">
-
-</tbody>
-
-
-</table>
-
-
-</div>
-
-
-
-<div id="entrees" class="page" style="display:none">
-
-
-<h2>Entrée stock</h2>
-
-
-<p>Module à venir</p>
-
-
-</div>
-
-
-</div>
-
-<script>
-
-let headers = {};
-
-
-// CONNEXION
-
-async function connexion(){
-
-let u = document.getElementById("user").value;
-let p = document.getElementById("pass").value;
-
-
-headers = {
-
-"Authorization":"Basic " + btoa(u + ":" + p)
-
-};
-
-
-
-let test = await fetch("/stats",{
-
-headers:headers
-
-});
-
-
-
-if(test.status === 401){
-
-alert("Identifiants incorrects");
-
-return;
-
-}
-
-
-
-document.getElementById("login").style.display="none";
-
-document.getElementById("app").style.display="block";
-
-
-charger();
-
-
-}
-
-
-
-// NAVIGATION
-
-function ouvrir(page){
-
-
-document.querySelectorAll(".page").forEach(x=>{
-
-x.style.display="none";
-
-});
-
-
-document.getElementById(page).style.display="block";
-
-
-}
-
-
-
-// CHARGER PRODUITS
-
-async function charger(){
-
-
-let res = await fetch("/produits",{
-
-headers:headers
-
-});
-
-
-let produits = await res.json();
-
-
-
-document.getElementById("total").innerText = produits.length;
-
-
-
-let html="";
-
-
-produits.forEach(p=>{
-
-
-html += `
-
-<tr>
-
-<td>${p.nom}</td>
-
-<td>${p.dateExpiration || "-"}</td>
-
-</tr>
-
-`;
-
-
-});
-
-
-document.getElementById("liste").innerHTML=html;
-
-
-}
-
-// MODULE ENTREE STOCK
-
-document.getElementById("entrees").innerHTML = `
-
-<h2>📥 Entrée stock</h2>
-
-<input id="nomProduit" placeholder="Nom du produit">
-
-<input id="codeProduit" placeholder="Code-barres">
-
-<input id="quantite" type="number" placeholder="Quantité">
-
-<input id="dateExpiration" type="date">
-
-<input id="emplacement" placeholder="Emplacement">
-
-<button onclick="ajouterProduit()">
-➕ Ajouter au stock
-</button>
-
-`;
-
-
-
-async function ajouterProduit(){
-
-
-let produit = {
-
-nom: document.getElementById("nomProduit").value,
-
-codeBarres: document.getElementById("codeProduit").value,
-
-quantite: Number(document.getElementById("quantite").value),
-
-dateExpiration: document.getElementById("dateExpiration").value,
-
-emplacement: document.getElementById("emplacement").value
-
-};
-
-
-
-let res = await fetch("/produits",{
-
-method:"POST",
-
-headers:{
-
-"Content-Type":"application/json",
-
-...headers
-
-},
-
-body:JSON.stringify(produit)
-
-});
-
-
-
-if(res.ok){
-
-alert("Produit ajouté avec succès");
-
-charger();
-verifierFEFO();
-}
-
-
-
-// ANALYSE FEFO
-
-async function verifierFEFO(){
-
-
-let res = await fetch("/produits",{
-
-headers:headers
-
-});
-
-
-let produits = await res.json();
-
-
-
-let aujourd = new Date();
-
-let alertes = [];
-
-
-
-produits.forEach(p=>{
-
-
-if(p.dateExpiration){
-
-
-let date = new Date(p.dateExpiration);
-
-
-let jours = (date - aujourd) /
-(1000*60*60*24);
-
-
-
-if(jours <= 30 && jours >= 0){
-
-alertes.push(
-p.nom + " expire bientôt"
-);
-
-}
-
-
-if(jours < 0){
-
-alertes.push(
-p.nom + " est expiré"
-);
-
-}
-
-
-}
-
-
-});
-
-
-
-if(alertes.length > 0){
-
-console.log("⚠️ ALERTES FEFO");
-
-console.log(alertes.join("\n"));
-
-}
-
-
-}}// SORTIE PRODUIT
-
-async function sortirProduit(id){
-
-
-let confirmation = confirm(
-"Confirmer la sortie de ce produit ?"
-);
-
-
-if(!confirmation){
-return;
-}
-
-
-
-let res = await fetch("/produits/"+id,{
-
-method:"DELETE",
-
-headers:headers
-
-});
-
-
-
-if(res.ok){
-
-alert("Produit sorti du stock");
-
-charger();
-
-}
-
-
-}
-</script>
+    <h1>FEFO 📦</h1>
+    <p class="subtitle">First Expired, First Out - Priorité aux produits à écouler</p>
+
+    <form id="form-produit">
+        <h3>Enregistrer un Produit</h3>
+        <button type="button" class="btn-scan">Annuler le scan</button>
+        <input type="text" id="nom" placeholder="Nom du produit (ex: Sac de luxe)" required>
+        <input type="text" id="codeBarres" placeholder="Code barres" required>
+        <input type="text" id="emplacement" placeholder="Emplacement" required>
+        <label>Date d'expiration / Vente limite :</label>
+        <input type="date" id="dateExpiration" required>
+        <button type="submit">Ajouter au Stock (FEFO)</button>
+    </form>
+
+    <table>
+        <thead>
+            <tr><th>Priorité</th><th>Nom</th><th>Code Barres</th><th>Emplacement</th><th>Date Limite</th><th>Actions</th></tr>
+        </thead>
+        <tbody id="table-corps"></tbody>
+    </table>
+
+    <script>
+        const API_URL = '/produits';
+
+        async function chargerStock() {
+            const res = await fetch(API_URL);
+            const produits = await res.json();
+            const corps = document.getElementById('table-corps');
+            corps.innerHTML = produits.map((p, i) => `
+                <tr>
+                    <td>${i + 1}</td>
+                    <td>${p.nom}</td>
+                    <td>${p.codeBarres}</td>
+                    <td>${p.emplacement}</td>
+                    <td>${p.dateExpiration}</td>
+                    <td><button class="btn-delete" onclick="supprimer('${p.id}')">Sortir du Stock</button></td>
+                </tr>
+            `).join('');
+        }
+
+        document.getElementById('form-produit').onsubmit = async (e) => {
+            e.preventDefault();
+            await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    nom: document.getElementById('nom').value,
+                    codeBarres: document.getElementById('codeBarres').value,
+                    emplacement: document.getElementById('emplacement').value,
+                    dateExpiration: document.getElementById('dateExpiration').value
+                })
+            });
+            document.getElementById('form-produit').reset();
+            chargerStock();
+        };
+
+        async function supprimer(id) {
+            await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+            chargerStock();
+        }
+
+        chargerStock();
+    </script>
 </body>
-
 </html>
