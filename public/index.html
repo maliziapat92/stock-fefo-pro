@@ -3,84 +3,387 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FEFO 📦</title>
+    <title>FEFO Pro | Système de Gestion & Qualité</title>
+    <!-- Inclusion de la bibliothèque de scan QR/Code-barres -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f9; }
-        h1 { text-align: center; }
-        .subtitle { text-align: center; color: #7f8c8d; margin-bottom: 20px; }
-        form { background: #fff; padding: 15px; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        input, button { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        button { background-color: #27ae60; color: white; cursor: pointer; font-weight: bold; }
-        .btn-scan { background-color: #e74c3c; }
-        table { width: 100%; border-collapse: collapse; background: white; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-        th { background-color: #2980b9; color: white; }
-        .btn-delete { background-color: #e74c3c; color: white; border: none; padding: 5px 10px; cursor: pointer; }
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --text: #f8fafc;
+            --text-secondary: #94a3b8;
+            --primary: #2563eb;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --border: #334155;
+        }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 15px; background-color: var(--bg); color: var(--text); padding-bottom: 60px; }
+        h1, h3 { margin: 0 0 10px 0; color: #fff; text-align: center; }
+        .subtitle { text-align: center; color: var(--text-secondary); margin-bottom: 20px; font-size: 0.9rem; }
+        
+        /* Dashboard / Stats */
+        .dashboard { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
+        .stat-card { background: var(--card); padding: 12px; border-radius: 8px; border: 1px solid var(--border); text-align: center; }
+        .stat-card h4 { margin: 0; font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase; }
+        .stat-card p { margin: 8px 0 0 0; font-size: 1.6rem; font-weight: bold; }
+        .stat-total { color: #fff; }
+        .stat-alerte { color: var(--warning); }
+        .stat-perte { color: var(--danger); }
+
+        /* Formulaire */
+        form { background: var(--card); padding: 15px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 20px; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .full-width { grid-column: span 2; }
+        label { font-size: 0.85rem; color: var(--text-secondary); display: block; margin-bottom: 4px; }
+        input, select { width: 100%; padding: 10px; border: 1px solid var(--border); background: #0f172a; color: #fff; border-radius: 6px; box-sizing: border-box; font-size: 0.9rem; }
+        input:focus, select:focus { border-color: var(--primary); outline: none; }
+        
+        /* Boutons */
+        button { width: 100%; padding: 12px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 0.95rem; transition: background 0.2s; }
+        .btn-submit { background-color: var(--success); color: white; margin-top: 10px; }
+        .btn-scan { background-color: var(--primary); color: white; margin-bottom: 10px; }
+        .btn-csv { background-color: #475569; color: white; margin-bottom: 15px; }
+        .btn-delete { background-color: var(--danger); color: white; padding: 6px 10px; font-size: 0.8rem; border-radius: 4px; width: auto; }
+        .btn-avarie { background-color: var(--warning); color: #000; padding: 6px 10px; font-size: 0.8rem; border-radius: 4px; width: auto; margin-right: 5px; }
+
+        /* Scanner Caméra Box */
+        #reader { width: 100%; background: #000; border-radius: 8px; margin-bottom: 10px; display: none; overflow: hidden; }
+
+        /* Recherche et Actions */
+        .search-box { margin-bottom: 15px; }
+
+        /* Tableau */
+        .table-container { overflow-x: auto; background: var(--card); border-radius: 8px; border: 1px solid var(--border); }
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; }
+        th, td { padding: 10px; border-bottom: 1px solid var(--border); }
+        th { background-color: #1e293b; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; font-size: 0.75rem; }
+        
+        /* Couleurs de lignes de Stock (Statuts / Alertes) */
+        .row-conforme { background-color: transparent; }
+        .row-warning { background-color: rgba(245, 158, 11, 0.15); color: #fbcfe8; } /* Proche péremption */
+        .row-périmé { background-color: rgba(239, 68, 68, 0.2); color: #fca5a5; }   /* Périmé */
+        .row-avarié { background-color: rgba(220, 38, 38, 0.35); color: #fca5a5; text-decoration: line-through; } /* Avarié */
+        
+        .badge { padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; display: inline-block; }
+        .badge-ok { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+        .badge-alert { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+        .badge-danger { background: rgba(239, 68, 68, 0.2); color: #f87171; }
     </style>
 </head>
 <body>
 
-    <h1>FEFO 📦</h1>
-    <p class="subtitle">First Expired, First Out - Priorité aux produits à écouler</p>
+    <h1>FEFO Pro 📦</h1>
+    <p class="subtitle">Gestion Industrielle, Traçabilité Lots & Contrôle Qualité</p>
 
+    <!-- 5. STATISTIQUES RAPIDES (DASHBOARD) -->
+    <div class="dashboard">
+        <div class="stat-card">
+            <h4>Stock Total</h4>
+            <p id="dash-total" class="stat-total">0</p>
+        </div>
+        <div class="stat-card">
+            <h4>Alertes (&lt;30j)</h4>
+            <p id="dash-alertes" class="stat-alerte">0</p>
+        </div>
+        <div class="stat-card">
+            <h4>Périmés/Avaries</h4>
+            <p id="dash-pertes" class="stat-perte">0</p>
+        </div>
+    </div>
+
+    <!-- 1. GESTION DE LA CAMÉRA (SCANNER) -->
+    <button type="button" class="btn-scan" id="btn-toggle-scan" onclick="toggleScanner()">📷 Ouvrir le Scanner Caméra</button>
+    <div id="reader"></div>
+
+    <!-- FORMULAIRE COMPLET (LOTS / DATES / EMPLACEMENTS) -->
     <form id="form-produit">
-        <h3>Enregistrer un Produit</h3>
-        <button type="button" class="btn-scan">Annuler le scan</button>
-        <input type="text" id="nom" placeholder="Nom du produit (ex: Sac de luxe)" required>
-        <input type="text" id="codeBarres" placeholder="Code barres" required>
-        <input type="text" id="emplacement" placeholder="Emplacement" required>
-        <label>Date d'expiration / Vente limite :</label>
-        <input type="date" id="dateExpiration" required>
-        <button type="submit">Ajouter au Stock (FEFO)</button>
+        <h3>Enregistrement d'un Lot</h3>
+        <div class="form-grid">
+            <div class="full-width">
+                <label>Nom du Produit</label>
+                <input type="text" id="nom" placeholder="Ex: Sac de luxe ou Matériau" required>
+            </div>
+            <div>
+                <label>Code Barres</label>
+                <input type="text" id="codeBarres" placeholder="Scanner ou écrire" required>
+            </div>
+            <div>
+                <label>N° de Lot</label>
+                <input type="text" id="numLot" placeholder="Ex: LOT-2026-A" required>
+            </div>
+            <div>
+                <label>Date de Fab.</label>
+                <input type="date" id="dateFabrication">
+            </div>
+            <div>
+                <label>Date de Péremption</label>
+                <input type="date" id="dateExpiration" required>
+            </div>
+            <div>
+                <label>Quantité Initiale</label>
+                <input type="number" id="quantite" placeholder="Ex: 50" min="1" required>
+            </div>
+            <div>
+                <label>Zone / Emplacement</label>
+                <input type="text" id="emplacement" placeholder="Ex: Rayon A1" required>
+            </div>
+        </div>
+        <button type="submit" class="btn-submit">Valider l'entrée en Stock (FEFO)</button>
     </form>
 
-    <table>
-        <thead>
-            <tr><th>Priorité</th><th>Nom</th><th>Code Barres</th><th>Emplacement</th><th>Date Limite</th><th>Actions</th></tr>
-        </thead>
-        <tbody id="table-corps"></tbody>
-    </table>
+    <!-- 2. BARRE DE RECHERCHE INSTANTANÉE -->
+    <div class="search-box">
+        <input type="text" id="recherche" placeholder="🔍 Rechercher par produit, code-barres ou N° de lot..." oninput="filtrerEtAfficher()">
+    </div>
+
+    <!-- 3. EXPORT DES DONNÉES (BACKUP CSV) -->
+    <button class="btn-csv" onclick="exporterCSV()">📥 Exporter l'inventaire en CSV (Excel)</button>
+
+    <!-- TABLEAU DE SUIVI DES LOTS -->
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Priorité (FEFO)</th>
+                    <th>Produit / Code</th>
+                    <th>N° Lot</th>
+                    <th>Emplacement</th>
+                    <th>Quantité</th>
+                    <th>Dates (Fab / Exp)</th>
+                    <th>Statut</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="table-corps"></tbody>
+        </table>
+    </div>
 
     <script>
         const API_URL = '/produits';
+        let stockGlobal = []; 
+        let html5QrcodeScanner = null;
 
-        async function chargerStock() {
-            const res = await fetch(API_URL);
-            const produits = await res.json();
-            const corps = document.getElementById('table-corps');
-            corps.innerHTML = produits.map((p, i) => `
-                <tr>
-                    <td>${i + 1}</td>
-                    <td>${p.nom}</td>
-                    <td>${p.codeBarres}</td>
-                    <td>${p.emplacement}</td>
-                    <td>${p.dateExpiration}</td>
-                    <td><button class="btn-delete" onclick="supprimer('${p.id}')">Sortir du Stock</button></td>
-                </tr>
-            `).join('');
+        // 1. FONCTION DE SCAN CAMÉRA
+        function toggleScanner() {
+            const readerDiv = document.getElementById('reader');
+            const btn = document.getElementById('btn-toggle-scan');
+            
+            if (readerDiv.style.display === 'block') {
+                if (html5QrcodeScanner) {
+                    html5QrcodeScanner.stop().then(() => {
+                        readerDiv.style.display = 'none';
+                        btn.innerText = "📷 Ouvrir le Scanner Caméra";
+                    });
+                }
+            } else {
+                readerDiv.style.display = 'block';
+                btn.innerText = "❌ Fermer le Scanner";
+                html5QrcodeScanner = new Html5Qrcode("reader");
+                html5QrcodeScanner.start(
+                    { facingMode: "environment" }, 
+                    { fps: 10, qrbox: { width: 250, height: 150 } },
+                    (decodedText) => {
+                        document.getElementById('codeBarres').value = decodedText;
+                        toggleScanner(); // Ferme après détection
+                    },
+                    (errorMessage) => { /* Erreur d'analyse normale en continu */ }
+                ).catch(err => {
+                    alert("Erreur d'accès à la caméra : " + err);
+                    readerDiv.style.display = 'none';
+                    btn.innerText = "📷 Ouvrir le Scanner Caméra";
+                });
+            }
         }
 
+        // CHARGEMENT DE L'API & LOGIQUE DE TRI AUTOMATIQUE FEFO (4) + DASHBOARD (5)
+        async function chargerStock() {
+            try {
+                const res = await fetch(API_URL);
+                stockGlobal = await res.json();
+                
+                // 4. TRI AUTOMATIQUE PAR LOGIQUE FEFO (Les plus proches d'expirer en premier)
+                stockGlobal.sort((a, b) => new Date(a.dateExpiration) - new Date(b.dateExpiration));
+                
+                calculerDashboard();
+                filtrerEtAfficher();
+            } catch (err) {
+                console.error("Erreur serveur API:", err);
+            }
+        }
+
+        // 5. STATISTIQUES RAPIDES (DASHBOARD CALCULS)
+        function calculerDashboard() {
+            let total = 0;
+            let alertes = 0;
+            let pertes = 0;
+            const aujourdhui = new Date();
+
+            stockGlobal.forEach(p => {
+                const qte = parseInt(p.quantite) || 0;
+                total += qte;
+
+                if (p.statut === 'Avarié') {
+                    pertes += qte;
+                } else {
+                    const dateExp = new Date(p.dateExpiration);
+                    const diffTemps = dateExp - aujourdhui;
+                    const diffJours = Math.ceil(diffTemps / (1000 * 60 * 60 * 24));
+
+                    if (diffJours <= 0) {
+                        pertes += qte; // Périmé
+                    } else if (diffJours <= 30) {
+                        alertes += qte; // Moins de 30 jours restants
+                    }
+                }
+            });
+
+            document.getElementById('dash-total').innerText = total;
+            document.getElementById('dash-alertes').innerText = alertes;
+            document.getElementById('dash-pertes').innerText = pertes;
+        }
+
+        // 2. FILTRE ET BARRE DE RECHERCHE INSTANTANÉE + RENDER DES LIGNES
+        function filtrerEtAfficher() {
+            const motCle = document.getElementById('recherche').value.toLowerCase();
+            const corps = document.getElementById('table-corps');
+            corps.innerHTML = '';
+
+            const aujourdhui = new Date();
+            let indexPriorite = 1;
+
+            stockGlobal.forEach((p) => {
+                const correspond = p.nom.toLowerCase().includes(motCle) || 
+                                   p.codeBarres.toLowerCase().includes(motCle) || 
+                                   (p.numLot && p.numLot.toLowerCase().includes(motCle));
+
+                if (!correspond) return;
+
+                // Détermination de la classe d'alerte visuelle
+                let classeLigne = 'row-conforme';
+                let statutBadge = `<span class="badge badge-ok">Conforme</span>`;
+                
+                if (p.statut === 'Avarié') {
+                    classeLigne = 'row-avarié';
+                    statutBadge = `<span class="badge badge-danger">AVARIÉ (${p.causeAvarie || 'Inconnue'})</span>`;
+                } else {
+                    const dateExp = new Date(p.dateExpiration);
+                    const diffJours = Math.ceil((dateExp - aujourdhui) / (1000 * 60 * 60 * 24));
+
+                    if (diffJours <= 0) {
+                        classeLigne = 'row-périmé';
+                        statutBadge = `<span class="badge badge-danger">PÉRIMÉ</span>`;
+                    } else if (diffJours <= 30) {
+                        classeLigne = 'row-warning';
+                        statutBadge = `<span class="badge badge-alert">⚠️ Expire sous ${diffJours}j</span>`;
+                    }
+                }
+
+                corps.innerHTML += `
+                    <tr class="${classeLigne}">
+                        <td><strong>${p.statut === 'Avarié' ? '-' : indexPriorite++}</strong></td>
+                        <td><strong>${p.nom}</strong><br><small style="color:var(--text-secondary)">${p.codeBarres}</small></td>
+                        <td><code>${p.numLot || 'N/A'}</code></td>
+                        <td>${p.emplacement}</td>
+                        <td><strong>${p.quantite}</strong></td>
+                        <td><small>F: ${p.dateFabrication || 'N/A'}<br><b>E: ${p.dateExpiration}</b></small></td>
+                        <td>${statutBadge}</td>
+                        <td>
+                            ${p.statut !== 'Avarié' ? `<button class="btn-avarie" onclick="declarerAvarie('${p.id}')">⚠️ Avarie</button>` : ''}
+                            <button class="btn-delete" onclick="sortirStock('${p.id}')">Sortir</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        // ENREGISTREMENT D'UN NOUVEAU PRODUIT / LOT
         document.getElementById('form-produit').onsubmit = async (e) => {
             e.preventDefault();
+            const nvLot = {
+                nom: document.getElementById('nom').value,
+                codeBarres: document.getElementById('codeBarres').value,
+                numLot: document.getElementById('numLot').value,
+                dateFabrication: document.getElementById('dateFabrication').value,
+                dateExpiration: document.getElementById('dateExpiration').value,
+                quantite: document.getElementById('quantite').value,
+                emplacement: document.getElementById('emplacement').value,
+                statut: 'Conforme'
+            };
+
             await fetch(API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    nom: document.getElementById('nom').value,
-                    codeBarres: document.getElementById('codeBarres').value,
-                    emplacement: document.getElementById('emplacement').value,
-                    dateExpiration: document.getElementById('dateExpiration').value
-                })
+                body: JSON.stringify(nvLot)
             });
+            
             document.getElementById('form-produit').reset();
             chargerStock();
         };
 
-        async function supprimer(id) {
-            await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
-            chargerStock();
+        // DÉCLARATION D'AVARIE (Module Qualité)
+        async function declarerAvarie(id) {
+            const cause = prompt("Précisez la cause de l'avarie (ex: Humidité, Casse, Emballage déchiré) :");
+            if (cause === null) return; // Annulé
+
+            // Récupération de l'objet
+            const item = stockGlobal.find(p => p.id === id);
+            if (item) {
+                item.statut = 'Avarié';
+                item.causeAvarie = cause;
+                
+                await fetch(`${API_URL}/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(item)
+                });
+                chargerStock();
+            }
         }
 
+        // DESTRUCTION / SORTIE PHYSIQUE DU STOCK
+        async function sortirStock(id) {
+            if(confirm("Confirmez-vous la sortie définitive de ce lot du stock ?")) {
+                await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+                chargerStock();
+            }
+        }
+
+        // 3. EXPORTS DE DONNÉES (GÉNÉRATEUR CSV)
+        function exporterCSV() {
+            if (stockGlobal.length === 0) {
+                alert("Aucune donnée à exporter.");
+                return;
+            }
+            let csvContent = "data:text/csv;charset=utf-8,";
+            csvContent += "Priorité,Nom Produit,Code Barres,Numero Lot,Emplacement,Quantite,Date Fabrication,Date Expiration,Statut,Cause Avarie\n";
+
+            stockGlobal.forEach((p, idx) => {
+                let ligne = [
+                    idx + 1,
+                    `"${p.nom}"`,
+                    `"${p.codeBarres}"`,
+                    `"${p.numLot || ''}"`,
+                    `"${p.emplacement}"`,
+                    p.quantite,
+                    p.dateFabrication || '',
+                    p.dateExpiration,
+                    `"${p.statut}"`,
+                    `"${p.causeAvarie || ''}"`
+                ];
+                csvContent += ligne.join(",") + "\n";
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `INVENTAIRE_FEFO_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // Premier démarrage
         chargerStock();
     </script>
 </body>
