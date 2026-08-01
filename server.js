@@ -1,10 +1,8 @@
-const { Low } = require("lowdb");
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const multer = require("multer");
 const fs = require("fs");
-const { JSONFile } = require("lowdb/node");
 require("dotenv").config();
 const userRoutes = require("./routes/userRoutes");
 const productRoutes = require("./routes/productRoutes");
@@ -48,21 +46,23 @@ app.use("/api", importExportRoutes);
 app.use("/api/backup", backupRoutes);
 app.use("/api/roles", roleRoutes);
 app.use("/api/settings", settingRoutes);
-const adapter = new JSONFile("./database/db.json");
-const db = new Low(adapter, {
-  users: [],
-  products: [],
-  lots: [],
-  stocks: [],
-  damages: [],
-  alerts: [],
-  movements: [],
-  history: [],
-  reports: []
-});
+
+// lowdb will be dynamically imported because it's an ES module
+let Low;
+let JSONFile;
+let db;
 
 // Initialisation base
 async function initDB() {
+  // dynamic import to avoid ERR_REQUIRE_ESM when running in CommonJS
+  const lowdb = await import('lowdb');
+  const lowdbNode = await import('lowdb/node');
+  Low = lowdb.Low;
+  JSONFile = lowdbNode.JSONFile;
+
+  const adapter = new JSONFile("./database/db.json");
+  db = new Low(adapter);
+
   await db.read();
 
   db.data ||= {
