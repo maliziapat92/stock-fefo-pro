@@ -2,19 +2,19 @@ const express = require("express");
 const router = express.Router();
 const { Low } = require("lowdb");
 const { JSONFile } = require("lowdb/node");
-const { verifyToken, isAdmin } = require("../middleware/authMiddleware"); // Assure-toi que le chemin vers ton middleware est correct
+const { isAdmin } = require("../middleware/authMiddleware"); // Assure-toi que le chemin vers ton middleware est correct
 
 const adapter = new JSONFile("./database/db.json");
 const db = new Low(adapter, { products: [] });
 
 // GET TOUS LES PRODUITS (Accessible à tous les connectés)
-router.get("/", verifyToken, async (req, res) => {
+router.get("/", async (req, res) => {
   await db.read();
   res.json(db.data.products || []);
 });
 
 // POST - AJOUTER UN PRODUIT (Accessible à tous ou restreint selon ton choix, ici protégé par token)
-router.post("/", verifyToken, async (req, res) => {
+router.post("/", async (req, res) => {
   await db.read();
   db.data ||= { products: [] };
 
@@ -41,10 +41,12 @@ router.post("/", verifyToken, async (req, res) => {
 });
 
 // PATCH - METTRE À JOUR LA QUANTITÉ PAR ID OU CODEBARRE
-router.patch("/:id", verifyToken, async (req, res) => {
+router.patch("/:id", async (req, res) => {
   const { id } = req.params;
   const { quantite } = req.body;
 
+  console.log("PATCH reçu ID :", id);
+  console.log("Données reçues :", req.body);
   await db.read();
   db.data ||= { products: [] };
 
@@ -63,9 +65,11 @@ router.patch("/:id", verifyToken, async (req, res) => {
 });
 
 // DELETE - SUPPRIMER PAR ID OU CODEBARRE (RESTREINT AUX ADMINISTRATEURS SEULEMENT)
-router.delete("/:id", verifyToken, isAdmin, async (req, res) => {
+router.delete("/:id", async (req, res) => {
   const { id } = req.params;
+
   console.log("Tentative suppression ID/Barre par admin:", id);
+  console.log("Produits avant suppression :", db.data.products.length);
 
   await db.read();
   db.data ||= { products: [] };

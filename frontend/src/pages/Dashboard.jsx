@@ -15,6 +15,7 @@ function Dashboard() {
     const [showAddForm, setShowAddForm] = useState(false);
     const [message, setMessage] = useState("");
     const [showScanner, setShowScanner] = useState(false);
+    const [alarmeCoupee, setAlarmeCoupee] = useState(false);
 
     // États pour la Caisse / Vente Générale
     const [showVenteModal, setShowVenteModal] = useState(false);
@@ -22,77 +23,6 @@ function Dashboard() {
     const [produitSelectionne, setProduitSelectionne] = useState(null);
     const [quantiteVendu, setQuantiteVendu] = useState(1);
     const [loadingVente, setLoadingVente] = useState(false);
-
-    // Helper pour rafraîchir les données
-    const refreshData = async () => {
-        try {
-            const [prodRes, statRes] = await Promise.all([
-                axios.get("http://localhost:5000/api/products"),
-                axios.get("http://localhost:5000/api/dashboard")
-            ]);
-            setProduits(prodRes.data);
-            setStats(statRes.data);
-        } catch (err) {
-            console.error("Erreur refreshData", err);
-        }
-    };
-
-
-    const validerVenteGenerale = async () => {
-        if (!produitSelectionne) {
-            showPopup("error", "Sélectionne un produit à vendre !");
-            return;
-        }
-
-        const qte = Number(quantiteVendu);
-        if (qte <= 0 || qte > produitSelectionne.quantite) {
-            showPopup("error", "Quantité invalide ou supérieure au stock disponible !");
-            return;
-        }
-
-        setLoadingVente(true);
-
-
-        try {
-            // On enregistre dans l'historique général / mouvements
-            await axios.post("http://localhost:5000/api/history", {
-                type: "VENTE",
-                produit: produitSelectionne.nom,
-                codeBarre: produitSelectionne.codeBarre || "N/A",
-                numeroLot: produitSelectionne.numeroLot || "N/A",
-                quantite: qte,
-                motif: "vendu",
-                date: new Date().toISOString()
-            });
-
-
-
-            // On utilise _id en priorité pour éviter les blocages sur les code-barres
-            const identifiant = produitSelectionne._id || produitSelectionne.id || produitSelectionne.codeBarre;
-
-            if (qte < produitSelectionne.quantite) {
-                await axios.patch(`http://localhost:5000/api/products/${identifiant}`, {
-                    quantite: produitSelectionne.quantite - qte
-                });
-            } else {
-                await axios.delete(`http://localhost:5000/api/products/${identifiant}`);
-            }
-
-            showPopup("success", `Vente de ${qte} unité(s) enregistrée avec succès 💰`);
-            setShowVenteModal(false);
-            setProduitSelectionne(null);
-            setRechercheVente("");
-            setQuantiteVendu(1);
-
-            await refreshData();
-        } catch (err) {
-            console.error("Erreur vente :", err.response?.data || err);
-            showPopup("error", "Erreur lors de la vente");
-        } finally {
-            setLoadingVente(false);
-        }
-    };
-
 
     // Formulaire d'ajout
     const [nomProduit, setNomProduit] = useState("");
@@ -114,14 +44,71 @@ function Dashboard() {
         boxSizing: "border-box"
     };
 
+    // Helper pour rafraîchir les données
+    const refreshData = async () => {
+        try {
+            const [prodRes, statRes] = await Promise.all([
+                axios.get("http://localhost:5000/api/products"),
+                axios.get("http://localhost:5000/api/dashboard")
+            ]);
+            setProduits(prodRes.data);
+            setStats(statRes.data);
+        } catch (err) {
+            console.error("Erreur refreshData", err);
+        }
+    };
+
     const showPopup = (type, message) => {
         setPopup({ show: true, type, message });
         setTimeout(() => setPopup({ show: false, type: "", message: "" }), 3000);
     };
 
-    // GESTION DES SUPPRESSIONS CLASSIQUES
-    const gererSuppression = async (codeBarreProduit) => {
-        const produit = produits.find(p => p.codeBarre === codeBarreProduit);
+    const arreterAlarme = () => {
+        if (window.alerteAudio) {
+            window.alerteAudio.pause();
+            window.alerteAudio.currentTime = 0;
+            window.alerteAudio = null;
+        }
+        setAlarmeCoupee(true);
+        setPopup({ show: false, type: "", message: "" });
+    };
+
+    // ===== FONCTION PÉRÉMPTION ROBUSTE =====
+    const verifierPeremption = () => {
+        const aujourdhui = new Date();
+        const produitPerime = produits.find(p => {
+            if (!p.dateExpiration) return false;
+            const exp = new Date(p.dateExpiration);
+            return exp < aujourdhui;
+        });
+
+        if (produitPerime) {
+            if (!window.alerteAudio && !alarmeCoupee) {
+                const audio = new Audio("/alert.mp3");
+                audio.loop = true;
+                audio.play()
+                    .then(() => console.log("🔊 Son joué"))
+                    .catch((err) => console.log("❌ Son bloqué :", err.message));
+                window.alerteAudio = audio;
+            }
+            showPopup("error", `⚠️ Produit périmé : ${produitPerime.nom}`);
+        } else {
+            if (window.alerteAudio) {
+                window.alerteAudio.pause();
+                window.alerteAudio.currentTime = 0;
+                window.alerteAudio = null;
+            }
+            setAlarmeCoupee(false);
+        }
+    };
+
+    useEffect(() => {
+        verifierPeremption();
+        const interval = setInterval(verifierPeremption, 60000);
+        return () => clearInterval(interval);
+    }, [produits]);
+
+    const gererSuppression = async (produit) => {
         if (!produit) return;
         if (!window.confirm(`Confirmez-vous la suppression de (${produit.nom}) ?`)) return;
 
@@ -136,7 +123,8 @@ function Dashboard() {
                 date: new Date().toISOString()
             });
 
-            await axios.delete(`http://localhost:5000/api/products/${produit.codeBarre}`);
+            const identifiant = produit._id || produit.id || produit.codeBarre;
+            await axios.delete(`http://localhost:5000/api/products/${identifiant}`);
 
             showPopup("success", "Produit supprimé avec succès 🗑️");
             await refreshData();
@@ -145,6 +133,73 @@ function Dashboard() {
             showPopup("error", "Échec de la suppression");
         }
     };
+
+
+// ===== FONCTION VENTE =====
+const validerVenteGenerale = async () => {
+    if (!produitSelectionne) {
+        showPopup("error", "Veuillez sélectionner un produit");
+        return;
+    }
+
+    const qte = Number(quantiteVendu);
+    if (!qte || qte < 1) {
+        showPopup("error", "Quantité invalide");
+        return;
+    }
+
+    if (qte > produitSelectionne.quantite) {
+        showPopup("error", `Stock insuffisant (max: ${produitSelectionne.quantite})`);
+        return;
+    }
+
+    setLoadingVente(true);
+
+    try {
+        // 1. Enregistrer dans l'historique
+        await axios.post("http://localhost:5000/api/history", {
+            type: "VENTE",
+            produit: produitSelectionne.nom,
+            codeBarre: produitSelectionne.codeBarre,
+            numeroLot: produitSelectionne.numeroLot,
+            quantite: qte,
+            motif: "vente",
+            date: new Date().toISOString()
+        });
+
+        const identifiant = produitSelectionne._id || produitSelectionne.id || produitSelectionne.codeBarre;
+        const nouvelleQuantite = produitSelectionne.quantite - qte;
+
+        // 2. Supprimer l'ancien produit
+        await axios.delete(`http://localhost:5000/api/products/${identifiant}`);
+
+        // 3. S'il reste du stock, on le recrée
+        if (nouvelleQuantite > 0) {
+            await axios.post("http://localhost:5000/api/products", {
+                nom: produitSelectionne.nom,
+                codeBarre: produitSelectionne.codeBarre,
+                numeroLot: produitSelectionne.numeroLot,
+                dateFabrication: produitSelectionne.dateFabrication,
+                dateExpiration: produitSelectionne.dateExpiration,
+                quantite: nouvelleQuantite
+            });
+        }
+
+        showPopup("success", `Vente enregistrée : ${qte} × ${produitSelectionne.nom}`);
+        setShowVenteModal(false);
+        setProduitSelectionne(null);
+        setRechercheVente("");
+        setQuantiteVendu(1);
+        await refreshData();
+    } catch (err) {
+        console.error(err);
+        showPopup("error", "Échec de la vente : " + (err.response?.data?.message || err.message));
+    } finally {
+        setLoadingVente(false);
+    }
+};
+
+
 
     // FILTRES avec useMemo
     const produitsFiltres = useMemo(() => {
@@ -158,12 +213,10 @@ function Dashboard() {
             .sort((a, b) => new Date(a.dateExpiration) - new Date(b.dateExpiration));
     }, [produits, search]);
 
-    // === CORRECTION DU FILTRE MODALE CAISSE ===
     const produitsModalFiltres = useMemo(() => {
         if (!rechercheVente.trim()) {
-            return produits; // Affiche tout le stock quand le champ est vide
+            return produits;
         }
-
         const term = rechercheVente.toLowerCase();
         return produits.filter(produit =>
             produit.nom?.toLowerCase().includes(term) ||
@@ -183,7 +236,6 @@ function Dashboard() {
         }).catch(() => setProduits([]));
     }, []);
 
-
     const enregistrerProduit = () => {
         if (!nomProduit.trim()) {
             setMessage("❌ Le nom du produit est obligatoire");
@@ -201,7 +253,12 @@ function Dashboard() {
             setMessage("✅ Produit enregistré avec succès");
             setTimeout(() => setMessage(""), 3000);
             setShowAddForm(false);
-            setNomProduit(""); setCodeBarre(""); setNumeroLot(""); setDateFabrication(""); setDateExpiration(""); setQuantite("");
+            setNomProduit("");
+            setCodeBarre("");
+            setNumeroLot("");
+            setDateFabrication("");
+            setDateExpiration("");
+            setQuantite("");
             refreshData();
         }).catch((err) => {
             console.error("Erreur complète :", err.response?.data);
@@ -209,13 +266,11 @@ function Dashboard() {
         });
     };
 
-
     const importerCsvBackend = async () => {
         if (!csvFile) {
             showPopup("error", "Sélectionne d'abord un fichier CSV !");
             return;
         }
-
         const formData = new FormData();
         formData.append("file", csvFile);
 
@@ -238,8 +293,22 @@ function Dashboard() {
         <div className="dashboard-dark">
             {/* ========== POP UP ========== */}
             {popup.show && (
-                <div style={{ position: "fixed", top: "20px", right: "20px", padding: "15px 20px", borderRadius: "8px", color: "white", backgroundColor: popup.type === "success" ? "#4CAF50" : "#f44336", boxShadow: "0 4px 12px rgba(0,0,0,0.3)", zIndex: 9999, fontWeight: "bold" }}>
-                    {popup.message}
+                <div style={{
+                    position: "fixed",
+                    top: "20px",
+                    right: "20px",
+                    padding: "15px",
+                    background: popup.type === "success" ? "#00c853" : "#ff3333",
+                    color: "white",
+                    borderRadius: "10px",
+                    zIndex: 9999
+                }}>
+                    <div>{popup.message}</div>
+                    {popup.type === "error" && (
+                        <button onClick={arreterAlarme} style={{ marginTop: 8, background: "#222", color: "white", border: "none", padding: "6px 12px", borderRadius: 6, cursor: "pointer" }}>
+                            🔇 Arrêter l'alarme
+                        </button>
+                    )}
                 </div>
             )}
 
@@ -254,8 +323,13 @@ function Dashboard() {
 
             {/* ========== RECHERCHE TEMPS RÉEL ========== */}
             <section className="product-search">
-                <div className="search-box" style={{display: "block", padding: "15px 20px"}}>
-                    <input type="text" placeholder="🔍 Nom, code-barres ou numéro de lot" value={search} onChange={(e) => setSearch(e.target.value)} />
+                <div className="search-box" style={{ display: "block", padding: "15px 20px" }}>
+                    <input
+                        type="text"
+                        placeholder="🔍 Nom, code-barres ou numéro de lot"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                    />
                 </div>
             </section>
 
@@ -290,7 +364,7 @@ function Dashboard() {
             {/* ========== LISTE PRODUITS COMPACTE FEFO ========== */}
             <div className="products-list" style={{ marginTop: 40 }}>
                 <h2 style={{ marginBottom: 20 }}>📦 Stock FEFO - {produitsFiltres.length} résultats</h2>
-                <div style={{display: "grid", gridTemplateColumns: "3fr 1fr 1fr 1fr 100px", gap: "15px", padding: "10px 18px", color: "#aaa", fontSize: 12, fontWeight: 600, borderBottom: "1px solid #333"}}>
+                <div style={{ display: "grid", gridTemplateColumns: "3fr 1fr 1fr 1fr 100px", gap: "15px", padding: "10px 18px", color: "#aaa", fontSize: 12, fontWeight: 600, borderBottom: "1px solid #333" }}>
                     <span>PRODUIT / LOT</span><span>QTÉ</span><span>EXPIRATION</span><span>STATUT</span><span>ACTION</span>
                 </div>
                 {produitsFiltres.length === 0 ? (
@@ -300,20 +374,26 @@ function Dashboard() {
                         const aujourdhui = new Date();
                         const exp = new Date(produit.dateExpiration);
                         const joursRestants = Math.ceil((exp - aujourdhui) / (1000 * 60 * 60 * 24));
-                        let statut = {text: "OK", color: "#00ff88"};
-                        if(joursRestants < 0) statut = {text: "EXPIRÉ", color: "#ff0044"};
-                        else if(joursRestants < 7) statut = {text: `URGENT ${joursRestants}j`, color: "#ff8800"};
-                        else if(joursRestants < 30) statut = {text: `ALERTE ${joursRestants}j`, color: "#ffcc00"};
+                        let statut = { text: "OK", color: "#00ff88" };
+                        if (joursRestants < 0) statut = { text: "EXPIRÉ", color: "#ff0044" };
+                        else if (joursRestants < 7) statut = { text: `URGENT ${joursRestants}j`, color: "#ff8800" };
+                        else if (joursRestants < 30) statut = { text: `ALERTE ${joursRestants}j`, color: "#ffcc00" };
 
                         return (
-                            <div key={produit.codeBarre + produit.numeroLot} style={{display: "grid", gridTemplateColumns: "3fr 1fr 1fr 1fr 100px", gap: "15px", padding: "15px 18px", borderBottom: "1px solid #222", alignItems: "center"}}>
-                                <div><strong>{produit.nom}</strong><br/><span style={{fontSize:12, color:"#aaa"}}>{produit.codeBarre} - Lot: {produit.numeroLot}</span></div>
+                            <div
+                                key={(produit._id || produit.id || produit.codeBarre) + (produit.numeroLot || "")}
+                                style={{ display: "grid", gridTemplateColumns: "3fr 1fr 1fr 1fr 100px", gap: "15px", padding: "15px 18px", borderBottom: "1px solid #222", alignItems: "center" }}
+                            >
+                                <div>
+                                    <strong>{produit.nom}</strong><br />
+                                    <span style={{ fontSize: 12, color: "#aaa" }}>{produit.codeBarre} - Lot: {produit.numeroLot}</span>
+                                </div>
                                 <div><strong>{produit.quantite}</strong></div>
                                 <div>{new Date(produit.dateExpiration).toLocaleDateString()}</div>
-                                <div style={{color: statut.color, fontWeight: 700}}>{statut.text}</div>
+                                <div style={{ color: statut.color, fontWeight: 700 }}>{statut.text}</div>
                                 <div>
                                     <button
-                                        onClick={() => gererSuppression(produit.codeBarre)}
+                                        onClick={() => gererSuppression(produit)}
                                         style={{ background: "#ff0044", color: "white", border: "none", padding: "6px 10px", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: "12px" }}
                                     >
                                         Supprimer
@@ -327,8 +407,14 @@ function Dashboard() {
 
             {/* ========== MODALE CAISSE / VENTE GÉNÉRALE ========== */}
             {showVenteModal && (
-                <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.85)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }} onClick={() => setShowVenteModal(false)}>
-                    <div style={{ background: "#161616", border: "1px solid #00c853", borderRadius: 18, padding: 25, width: "100%", maxWidth: "480px", color: "white", maxHeight: "90vh", display: "flex", flexDirection: "column" }} onClick={(e) => e.stopPropagation()}>
+                <div
+                    style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.85)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}
+                    onClick={() => setShowVenteModal(false)}
+                >
+                    <div
+                        style={{ background: "#161616", border: "1px solid #00c853", borderRadius: 18, padding: 25, width: "100%", maxWidth: "480px", color: "white", maxHeight: "90vh", display: "flex", flexDirection: "column" }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         <h2 style={{ marginBottom: 15, textAlign: "center", color: "#00c853" }}>🛒 Caisse - Enregistrer une Vente</h2>
 
                         <label style={{ display: "block", marginBottom: 6, color: "#aaa", fontSize: 13 }}>1. Rechercher un produit</label>
@@ -349,24 +435,28 @@ function Dashboard() {
                             ) : (
                                 produitsModalFiltres.map((p) => (
                                     <div
-                                        key={p.codeBarre + p.numeroLot}
+                                        key={(p._id || p.id || p.codeBarre) + (p.numeroLot || "")}
                                         onClick={() => setProduitSelectionne(p)}
                                         style={{
                                             padding: "10px 12px",
                                             borderBottom: "1px solid #222",
                                             cursor: "pointer",
-                                            background: produitSelectionne?.codeBarre === p.codeBarre ? "rgba(0,200,83,0.25)" : "transparent",
+                                            background: (produitSelectionne?._id || produitSelectionne?.id || produitSelectionne?.codeBarre) === (p._id || p.id || p.codeBarre) ? "rgba(0,200,83,0.25)" : "transparent",
                                             display: "flex",
                                             justifyContent: "space-between",
                                             alignItems: "center"
                                         }}
                                     >
                                         <div>
-                                            <strong style={{ fontSize: 14, color: produitSelectionne?.codeBarre === p.codeBarre ? "#00ff88" : "white" }}>{p.nom}</strong>
+                                            <strong style={{ fontSize: 14, color: (produitSelectionne?._id || produitSelectionne?.id || produitSelectionne?.codeBarre) === (p._id || p.id || p.codeBarre) ? "#00ff88" : "white" }}>
+                                                {p.nom}
+                                            </strong>
                                             <div style={{ fontSize: 11, color: "#aaa" }}>Lot: {p.numeroLot} | Barre: {p.codeBarre}</div>
                                         </div>
                                         <div style={{ textAlign: "right" }}>
-                                            <span style={{ fontSize: 12, color: "#00ff88", fontWeight: "bold", background: "#052e16", padding: "4px 8px", borderRadius: 4 }}>Stock: {p.quantite}</span>
+                                            <span style={{ fontSize: 12, color: "#00ff88", fontWeight: "bold", background: "#052e16", padding: "4px 8px", borderRadius: 4 }}>
+                                                Stock: {p.quantite}
+                                            </span>
                                         </div>
                                     </div>
                                 ))
@@ -407,13 +497,19 @@ function Dashboard() {
                                 fontWeight: 700,
                                 fontSize: 16,
                                 cursor: loadingVente ? "not-allowed" : "pointer"
-                            }}>
+                            }}
+                        >
                             {loadingVente ? "Traitement..." : "✅ Valider la vente"}
                         </button>
 
                         <button
-                            onClick={() => { setShowVenteModal(false); setProduitSelectionne(null); setRechercheVente(""); }}
-                            style={{ marginTop: 8, width: "100%", height: 40, background: "#333", border: "none", borderRadius: 12, color: "white", fontWeight: 600, cursor: "pointer" }}>
+                            onClick={() => {
+                                setShowVenteModal(false);
+                                setProduitSelectionne(null);
+                                setRechercheVente("");
+                            }}
+                            style={{ marginTop: 8, width: "100%", height: 40, background: "#333", border: "none", borderRadius: 12, color: "white", fontWeight: 600, cursor: "pointer" }}
+                        >
                             Fermer
                         </button>
                     </div>
@@ -422,8 +518,15 @@ function Dashboard() {
 
             {/* ========== FORMULAIRE AJOUT POPUP ========== */}
             {showAddForm && (
-                <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.85)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }} onClick={() => setShowAddForm(false)}>
-                    <div className="add-product-box" style={{ background: "#161616", border: "1px solid #00ff88", borderRadius: 18, padding: 25, width: "100%", maxWidth: "500px", color: "white" }} onClick={(e) => e.stopPropagation()}>
+                <div
+                    style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.85)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}
+                    onClick={() => setShowAddForm(false)}
+                >
+                    <div
+                        className="add-product-box"
+                        style={{ background: "#161616", border: "1px solid #00ff88", borderRadius: 18, padding: 25, width: "100%", maxWidth: "500px", color: "white" }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         <h2 style={{ marginBottom: 20, textAlign: "center" }}>Nouveau produit</h2>
                         <input placeholder="Nom produit" value={nomProduit} onChange={(e) => setNomProduit(e.target.value)} style={inputStyle} />
                         <input placeholder="Code-barres" value={codeBarre} onChange={(e) => setCodeBarre(e.target.value)} style={inputStyle} />
@@ -433,8 +536,19 @@ function Dashboard() {
                         <label style={{ display: "block", margin: "12px 0 6px", color: "#aaa" }}>Date expiration</label>
                         <input type="date" value={dateExpiration} onChange={(e) => setDateExpiration(e.target.value)} style={inputStyle} />
                         <input placeholder="Quantité" type="number" value={quantite} onChange={(e) => setQuantite(e.target.value)} style={inputStyle} />
-                        <button className="action-btn" onClick={enregistrerProduit} style={{ marginTop: 20, width: "100%", height: 55, background: "#00c853", border: "none", borderRadius: 12, color: "white", fontWeight: 700, fontSize: 16, cursor: "pointer" }}>✅ Enregistrer</button>
-                        <button onClick={() => setShowAddForm(false)} style={{ marginTop: 10, width: "100%", height: 45, background: "#333", border: "none", borderRadius: 12, color: "white", fontWeight: 600, cursor: "pointer" }}>Annuler</button>
+                        <button
+                            className="action-btn"
+                            onClick={enregistrerProduit}
+                            style={{ marginTop: 20, width: "100%", height: 55, background: "#00c853", border: "none", borderRadius: 12, color: "white", fontWeight: 700, fontSize: 16, cursor: "pointer" }}
+                        >
+                            ✅ Enregistrer
+                        </button>
+                        <button
+                            onClick={() => setShowAddForm(false)}
+                            style={{ marginTop: 10, width: "100%", height: 45, background: "#333", border: "none", borderRadius: 12, color: "white", fontWeight: 600, cursor: "pointer" }}
+                        >
+                            Annuler
+                        </button>
                     </div>
                 </div>
             )}
@@ -470,13 +584,19 @@ function Dashboard() {
             {message && (
                 <div className="success-message" style={{ marginTop: 20, padding: 14, background: message.includes("✅") ? "#052e16" : "#450a0a", borderRadius: 12, textAlign: "center", fontWeight: 600 }}>
                     {message}
-                    </div>
+                </div>
             )}
 
             {/* ========== MODALE IMPORT CSV ========== */}
             {showCsvModal && (
-                <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.85)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }} onClick={() => setShowCsvModal(false)}>
-                    <div style={{ background: "#161616", border: "1px solid #00ff88", borderRadius: 18, padding: 25, width: "100%", maxWidth: "500px", color: "white" }} onClick={(e) => e.stopPropagation()}>
+                <div
+                    style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.85)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}
+                    onClick={() => setShowCsvModal(false)}
+                >
+                    <div
+                        style={{ background: "#161616", border: "1px solid #00ff88", borderRadius: 18, padding: 25, width: "100%", maxWidth: "500px", color: "white" }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         <h2 style={{ marginBottom: 20, textAlign: "center" }}>📁 Importer un stock CSV</h2>
                         <input
                             type="file"
@@ -491,12 +611,14 @@ function Dashboard() {
                         )}
                         <button
                             onClick={importerCsvBackend}
-                            style={{ marginTop: 20, width: "100%", height: 55, background: "#00c853", border: "none", borderRadius: 12, color: "white", fontWeight: 700, fontSize: 16, cursor: "pointer" }}>
+                            style={{ marginTop: 20, width: "100%", height: 55, background: "#00c853", border: "none", borderRadius: 12, color: "white", fontWeight: 700, fontSize: 16, cursor: "pointer" }}
+                        >
                             🚀 Lancer l'import
                         </button>
                         <button
                             onClick={() => setShowCsvModal(false)}
-                            style={{ marginTop: 10, width: "100%", height: 45, background: "#333", border: "none", borderRadius: 12, color: "white", fontWeight: 600, cursor: "pointer" }}>
+                            style={{ marginTop: 10, width: "100%", height: 45, background: "#333", border: "none", borderRadius: 12, color: "white", fontWeight: 600, cursor: "pointer" }}
+                        >
                             Annuler
                         </button>
                     </div>

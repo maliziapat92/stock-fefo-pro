@@ -61,7 +61,19 @@ async function initDB() {
   JSONFile = lowdbNode.JSONFile;
 
   const adapter = new JSONFile("./database/db.json");
-  db = new Low(adapter);
+  
+  // Provide default data to avoid "missing default data" error
+  db = new Low(adapter, {
+    users: [],
+    products: [],
+    lots: [],
+    stocks: [],
+    damages: [],
+    alerts: [],
+    movements: [],
+    history: [],
+    reports: []
+  });
 
   await db.read();
 
@@ -87,6 +99,13 @@ app.get("/", (req, res) => {
   });
 });
 
+app.get("/api", (req, res) => {
+  res.json({
+    message: "API Stock FEFO Pro",
+    status: "running"
+  });
+});
+
 app.get("/api/status", async (req, res) => {
   await db.read();
 
@@ -100,8 +119,13 @@ app.get("/api/status", async (req, res) => {
 const PORT = process.env.PORT || 5000;
 
 initDB().then(() => {
-  app.listen(PORT, () => {
-    console.log(`🚀 Serveur lancé sur le port ${PORT}`);
-    console.log("✅ Base JSON connectée");
-  });
+  console.log("✅ Base JSON connectée");
+
+  if (require.main === module) {
+    app.listen(PORT, () => {
+      console.log(`🚀 Serveur lancé sur le port ${PORT}`);
+    });
+  }
 });
+
+module.exports = app;
