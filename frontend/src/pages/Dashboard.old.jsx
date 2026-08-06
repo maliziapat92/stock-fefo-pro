@@ -21,16 +21,16 @@ function Dashboard() {
     const [showVenteModal, setShowVenteModal] = useState(false);
     const [rechercheVente, setRechercheVente] = useState("");
     const [produitSelectionne, setProduitSelectionne] = useState(null);
-    const [quantityVendu, setQuantiteVendu] = useState(1);
+    const [quantiteVendu, setQuantiteVendu] = useState(1);
     const [loadingVente, setLoadingVente] = useState(false);
 
     // Formulaire d'ajout
-    const [name, setNomProduit] = useState("");
+    const [nomProduit, setNomProduit] = useState("");
     const [codeBarre, setCodeBarre] = useState("");
     const [numeroLot, setNumeroLot] = useState("");
     const [dateFabrication, setDateFabrication] = useState("");
-    const [expiry_date, setDateExpiration] = useState("");
-    const [quantity, setQuantite] = useState("");
+    const [dateExpiration, setDateExpiration] = useState("");
+    const [quantite, setQuantite] = useState("");
 
     const inputStyle = {
         width: "100%",
@@ -77,8 +77,8 @@ function Dashboard() {
     const verifierPeremption = () => {
         const aujourdhui = new Date();
         const produitPerime = produits.find(p => {
-            if (!p.expiry_date) return false;
-            const exp = new Date(p.expiry_date);
+            if (!p.dateExpiration) return false;
+            const exp = new Date(p.dateExpiration);
             return exp < aujourdhui;
         });
 
@@ -118,7 +118,7 @@ function Dashboard() {
                 produit: produit.nom,
                 codeBarre: produit.codeBarre,
                 numeroLot: produit.numeroLot,
-                quantity: produit.quantity,
+                quantite: produit.quantite,
                 motif: "supprime",
                 date: new Date().toISOString()
             });
@@ -142,14 +142,14 @@ const validerVenteGenerale = async () => {
         return;
     }
 
-    const qte = Number(quantityVendu);
+    const qte = Number(quantiteVendu);
     if (!qte || qte < 1) {
         showPopup("error", "Quantité invalide");
         return;
     }
 
-    if (qte > produitSelectionne.quantity) {
-        showPopup("error", `Stock insuffisant (max: ${produitSelectionne.quantity})`);
+    if (qte > produitSelectionne.quantite) {
+        showPopup("error", `Stock insuffisant (max: ${produitSelectionne.quantite})`);
         return;
     }
 
@@ -162,13 +162,13 @@ const validerVenteGenerale = async () => {
             produit: produitSelectionne.nom,
             codeBarre: produitSelectionne.codeBarre,
             numeroLot: produitSelectionne.numeroLot,
-            quantity: qte,
+            quantite: qte,
             motif: "vente",
             date: new Date().toISOString()
         });
 
         const identifiant = produitSelectionne._id || produitSelectionne.id || produitSelectionne.codeBarre;
-        const nouvelleQuantite = produitSelectionne.quantity - qte;
+        const nouvelleQuantite = produitSelectionne.quantite - qte;
 
         // 2. Supprimer l'ancien produit
         await axios.delete(`http://localhost:5000/api/products/${identifiant}`);
@@ -180,8 +180,8 @@ const validerVenteGenerale = async () => {
                 codeBarre: produitSelectionne.codeBarre,
                 numeroLot: produitSelectionne.numeroLot,
                 dateFabrication: produitSelectionne.dateFabrication,
-                expiry_date: produitSelectionne.expiry_date,
-                quantity: nouvelleQuantite
+                dateExpiration: produitSelectionne.dateExpiration,
+                quantite: nouvelleQuantite
             });
         }
 
@@ -210,7 +210,7 @@ const validerVenteGenerale = async () => {
                 produit.codeBarre?.toLowerCase().includes(search.toLowerCase()) ||
                 produit.numeroLot?.toLowerCase().includes(search.toLowerCase())
             )
-            .sort((a, b) => new Date(a.expiry_date) - new Date(b.expiry_date));
+            .sort((a, b) => new Date(a.dateExpiration) - new Date(b.dateExpiration));
     }, [produits, search]);
 
     const produitsModalFiltres = useMemo(() => {
@@ -237,18 +237,18 @@ const validerVenteGenerale = async () => {
     }, []);
 
     const enregistrerProduit = () => {
-        if (!name.trim()) {
+        if (!nomProduit.trim()) {
             setMessage("❌ Le nom du produit est obligatoire");
             return;
         }
 
         axios.post("http://localhost:5000/api/products", {
-            nom: name,
+            nom: nomProduit,
             codeBarre: codeBarre.trim() || "N/A",
             numeroLot,
             dateFabrication,
-            expiry_date,
-            quantity: Number(quantity) || 0,
+            dateExpiration,
+            quantite: Number(quantite) || 0,
         }).then(() => {
             setMessage("✅ Produit enregistré avec succès");
             setTimeout(() => setMessage(""), 3000);
@@ -372,7 +372,7 @@ const validerVenteGenerale = async () => {
                 ) : (
                     produitsFiltres.map((produit) => {
                         const aujourdhui = new Date();
-                        const exp = new Date(produit.expiry_date);
+                        const exp = new Date(produit.dateExpiration);
                         const joursRestants = Math.ceil((exp - aujourdhui) / (1000 * 60 * 60 * 24));
                         let statut = { text: "OK", color: "#00ff88" };
                         if (joursRestants < 0) statut = { text: "EXPIRÉ", color: "#ff0044" };
@@ -388,8 +388,8 @@ const validerVenteGenerale = async () => {
                                     <strong>{produit.nom}</strong><br />
                                     <span style={{ fontSize: 12, color: "#aaa" }}>{produit.codeBarre} - Lot: {produit.numeroLot}</span>
                                 </div>
-                                <div><strong>{produit.quantity}</strong></div>
-                                <div>{new Date(produit.expiry_date).toLocaleDateString()}</div>
+                                <div><strong>{produit.quantite}</strong></div>
+                                <div>{new Date(produit.dateExpiration).toLocaleDateString()}</div>
                                 <div style={{ color: statut.color, fontWeight: 700 }}>{statut.text}</div>
                                 <div>
                                     <button
@@ -455,7 +455,7 @@ const validerVenteGenerale = async () => {
                                         </div>
                                         <div style={{ textAlign: "right" }}>
                                             <span style={{ fontSize: 12, color: "#00ff88", fontWeight: "bold", background: "#052e16", padding: "4px 8px", borderRadius: 4 }}>
-                                                Stock: {p.quantity}
+                                                Stock: {p.quantite}
                                             </span>
                                         </div>
                                     </div>
@@ -469,7 +469,7 @@ const validerVenteGenerale = async () => {
                                     <span style={{ fontSize: 11, color: "#aaa", display: "block" }}>Sélectionné :</span>
                                     <strong style={{ color: "#00ff88", fontSize: 14 }}>{produitSelectionne.nom}</strong>
                                 </div>
-                                <span style={{ fontSize: 12, color: "#ccc" }}>Max : {produitSelectionne.quantity}</span>
+                                <span style={{ fontSize: 12, color: "#ccc" }}>Max : {produitSelectionne.quantite}</span>
                             </div>
                         )}
 
@@ -477,8 +477,8 @@ const validerVenteGenerale = async () => {
                         <input
                             type="number"
                             min="1"
-                            max={produitSelectionne ? produitSelectionne.quantity : 999}
-                            value={quantityVendu}
+                            max={produitSelectionne ? produitSelectionne.quantite : 999}
+                            value={quantiteVendu}
                             onChange={(e) => setQuantiteVendu(e.target.value)}
                             style={inputStyle}
                         />
@@ -528,14 +528,14 @@ const validerVenteGenerale = async () => {
                         onClick={(e) => e.stopPropagation()}
                     >
                         <h2 style={{ marginBottom: 20, textAlign: "center" }}>Nouveau produit</h2>
-                        <input placeholder="Nom produit" value={name} onChange={(e) => setNomProduit(e.target.value)} style={inputStyle} />
+                        <input placeholder="Nom produit" value={nomProduit} onChange={(e) => setNomProduit(e.target.value)} style={inputStyle} />
                         <input placeholder="Code-barres" value={codeBarre} onChange={(e) => setCodeBarre(e.target.value)} style={inputStyle} />
                         <input placeholder="Numéro lot" value={numeroLot} onChange={(e) => setNumeroLot(e.target.value)} style={inputStyle} />
                         <label style={{ display: "block", margin: "12px 0 6px", color: "#aaa" }}>Date fabrication</label>
                         <input type="date" value={dateFabrication} onChange={(e) => setDateFabrication(e.target.value)} style={inputStyle} />
                         <label style={{ display: "block", margin: "12px 0 6px", color: "#aaa" }}>Date expiration</label>
-                        <input type="date" value={expiry_date} onChange={(e) => setDateExpiration(e.target.value)} style={inputStyle} />
-                        <input placeholder="Quantité" type="number" value={quantity} onChange={(e) => setQuantite(e.target.value)} style={inputStyle} />
+                        <input type="date" value={dateExpiration} onChange={(e) => setDateExpiration(e.target.value)} style={inputStyle} />
+                        <input placeholder="Quantité" type="number" value={quantite} onChange={(e) => setQuantite(e.target.value)} style={inputStyle} />
                         <button
                             className="action-btn"
                             onClick={enregistrerProduit}

@@ -1,70 +1,47 @@
 import { query } from '../models/db.js';
 
-// Récupérer les produits (FEFO)
+// Récupérer tous les produits (triés par date d'expiration pour respecter le FEFO)
 export const getProducts = async (req, res) => {
   try {
-    const result = await query(
-      'SELECT * FROM products ORDER BY expiry_date ASC'
-    );
-
+    const result = await query('SELECT * FROM products ORDER BY date_expiration ASC');
     res.json(result.rows);
-
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
-
 
 // Ajouter un produit
 export const createProduct = async (req, res) => {
   try {
-    const {
-      name,
-      quantity,
-      expiry_date,
-      barcode,
-      lot_number,
-      manufacture_date,
-      price
-    } = req.body;
-
+    const { nom, quantite, prix, date_fabrication, date_expiration } = req.body;
+    
     const result = await query(
-      `INSERT INTO products
-      (name, quantity, expiry_date, barcode, lot_number, manufacture_date, price)
-      VALUES ($1,$2,$3,$4,$5,$6,$7)
-      RETURNING *`,
-      [
-        name,
-        quantity || 0,
-        expiry_date || null,
-        barcode || null,
-        lot_number || null,
-        manufacture_date || null,
-        price || null
-      ]
+      'INSERT INTO products (nom, quantite, prix, date_fabrication, date_expiration) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [nom, quantite, prix, date_fabrication || null, date_expiration || null]
     );
-
+    
     res.status(201).json({
       message: "Produit ajouté avec succès",
       product: result.rows[0]
     });
-
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
-
-
-// Modifier quantité
+// Modifier la quantité d'un produit (vente)
 export const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const { quantity } = req.body;
+    const { quantite } = req.body;
 
     const result = await query(
-      'UPDATE products SET quantity=$1 WHERE id=$2 RETURNING *',
-      [quantity, id]
+      'UPDATE products SET quantite = $1 WHERE id = $2 RETURNING *',
+      [quantite, id]
     );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Produit non trouvé" });
+    }
 
     res.json(result.rows[0]);
 
@@ -74,15 +51,19 @@ export const updateProduct = async (req, res) => {
 };
 
 
-// Supprimer produit
+// Supprimer un produit
 export const deleteProduct = async (req, res) => {
   try {
     const { id } = req.params;
 
     const result = await query(
-      'DELETE FROM products WHERE id=$1 RETURNING *',
+      'DELETE FROM products WHERE id = $1 RETURNING *',
       [id]
     );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Produit non trouvé" });
+    }
 
     res.json({
       message: "Produit supprimé avec succès",

@@ -1,57 +1,137 @@
-import React, { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import axios from "axios";
 
 function Products() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+
+  const chargerProduits = async () => {
+    try {
+      const response = await axios.get(
+        "http://localhost:5000/api/products"
+      );
+
+      setProducts(response.data);
+    } catch (error) {
+      console.error("Erreur chargement produits :", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    // Récupération des produits depuis ton backend
-    axios.get("http://localhost:5000/api/products")
-      .then((response) => {
-        setProducts(response.data);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error("Erreur lors du chargement des produits:", err);
-        setError("Impossible de charger les produits.");
-        setLoading(false);
-      });
+    chargerProduits();
   }, []);
 
-  if (loading) return <div style={{ padding: "20px" }}>Chargement des produits...</div>;
-  if (error) return <div style={{ padding: "20px", color: "red" }}>{error}</div>;
+  if (loading) {
+    return (
+      <div className="page-container">
+        Chargement des produits...
+      </div>
+    );
+  }
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h2>Gestion des Produits</h2>
-      <p>Liste globale de votre stock enregistrée dans la base de données.</p>
+    <div className="page-container" style={{ padding: "20px", color: "white" }}>
+      <h2>📦 Gestion des Produits</h2>
+
+      <p style={{ color: "#aaa" }}>
+        Liste complète du stock FEFO.
+      </p>
 
       {products.length === 0 ? (
-        <p>Aucun produit trouvé pour le moment.</p>
+        <p>Aucun produit trouvé.</p>
       ) : (
-        <div style={{ overflowX: "auto", marginTop: "20px" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", background: "#fff" }}>
+        <div style={{ overflowX: "auto", marginTop: 20 }}>
+
+          <table
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              background: "#161616"
+            }}
+          >
+
             <thead>
-              <tr style={{ background: "#f4f4f4", textAlign: "left" }}>
-                <th style={{ padding: "10px", border: "1px solid #ddd" }}>Nom</th>
-                <th style={{ padding: "10px", border: "1px solid #ddd" }}>Quantité</th>
-                <th style={{ padding: "10px", border: "1px solid #ddd" }}>Date de péremption</th>
+              <tr style={{ background: "#222" }}>
+                <th>Produit</th>
+                <th>Code-barres</th>
+                <th>Lot</th>
+                <th>Quantité</th>
+                <th>Fabrication</th>
+                <th>Expiration</th>
+                <th>Prix</th>
               </tr>
             </thead>
+
+
             <tbody>
-              {products.map((product, index) => (
-                <tr key={product.id || index}>
-                  <td style={{ padding: "10px", border: "1px solid #ddd" }}>{product.name || product.nom}</td>
-                  <td style={{ padding: "10px", border: "1px solid #ddd" }}>{product.quantity || product.quantite}</td>
-                  <td style={{ padding: "10px", border: "1px solid #ddd" }}>{product.expiryDate || product.date_peremption || "N/A"}</td>
+
+              {products.map((product) => (
+
+                <tr
+                  key={product.id}
+                  style={{
+                    borderBottom: "1px solid #333"
+                  }}
+                >
+
+                  <td style={{ padding: 12 }}>
+                    {product.name}
+                  </td>
+
+
+                  <td>
+                    {product.barcode || "-"}
+                  </td>
+
+
+                  <td>
+                    {product.lot_number || "-"}
+                  </td>
+
+
+                  <td style={{ color:"#00ff88", fontWeight:"bold" }}>
+                    {product.quantity}
+                  </td>
+
+
+                  <td>
+                    {product.manufacture_date
+                      ? new Date(product.manufacture_date)
+                        .toLocaleDateString()
+                      : "-"
+                    }
+                  </td>
+
+
+                  <td>
+                    {product.expiry_date
+                      ? new Date(product.expiry_date)
+                        .toLocaleDateString()
+                      : "-"
+                    }
+                  </td>
+
+
+                  <td>
+                    {product.price
+                      ? product.price + " FCFA"
+                      : "-"
+                    }
+                  </td>
+
                 </tr>
+
               ))}
+
             </tbody>
+
           </table>
+
         </div>
       )}
+
     </div>
   );
 }

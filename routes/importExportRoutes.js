@@ -1,85 +1,56 @@
-const express = require("express");
-const router = express.Router();
-const multer = require("multer");
-const fs = require("fs");
-const { Low } = require("lowdb");
-const { JSONFile } = require("lowdb/node");
-const { verifyToken } = require("../middleware/authMiddleware");
+import express from 'express';
+import multer from 'multer';
+import fs from 'fs';
+import { query } from '../models/db.js';
 
-const adapter = new JSONFile("./database/db.json");
-const db = new Low(adapter, { products: [] });
+const router = express.Router();
 const upload = multer({ dest: 'uploads/' });
 
-const {
-  exportProducts,
-  exportPDF
-} = require("../controllers/importExportController");
-
-// Export produits JSON (Réservé au Magasinier/Utilisateur connecté)
-router.get("/products", verifyToken, exportProducts);
-
-// Export rapport PDF (Réservé au Magasinier/Utilisateur connecté)
-router.get("/pdf", verifyToken, exportPDF);
-
-// Route pour l'import du fichier CSV (Réservé au Magasinier/Utilisateur connecté)
-router.post('/upload-csv', verifyToken, upload.single('file'), async (req, res) => {
+// Import CSV
+router.post('/upload-csv', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ message: "Aucun fichier fourni" });
+      return res.status(400).json({ message: 'Aucun fichier fourni' });
     }
 
-    const filePath = req.file.path;
-    const fileContent = fs.readFileSync(filePath, 'utf8');
+    const fileContent = fs.readFileSync(req.file.path, 'utf8');
+    fs.unlinkSync(req.file.path); // supprimer le fichier temporaire
 
-    // Supprimer le fichier temporaire après lecture
-    fs.unlinkSync(filePath);
-
-    // Lecture et initialisation de la base Lowdb
-    await db.read();
-    db.data.products = db.data.products || [];
-
-    // On analyse les lignes du fichier CSV
-    const lines = fileContent.split(/\r?\n/).filter(line => line.trim() !== "");
+    const lines = fileContent.split(/\r?\n/).filter(line => line.trim() !== '');
 
     let addedCount = 0;
+
+    // On saute la première ligne (en-tête)
     for (let i = 1; i < lines.length; i++) {
       const parts = lines[i].split(',');
-      if (parts.length >= 2) {
-        const nomProduit = parts[0].trim();
-        const quantiteAjoutee = parseInt(parts[1]) || 0;
+      if (parts.length < 2) continue;
 
-        // Vérifier si le produit existe déjà (insensible à la casse)
-        const existingProduct = db.data.products.find(
-          p => p.name.toLowerCase() === nomProduit.toLowerCase()
-        );
+      const name = parts[0].trim();
+      const quantity = parseInt(parts[1]) || 0;
+      const expiry_date = parts[2]?.trim() || null;
+      const lot_number = parts[3]?.trim() || null;
+      const barcode = parts[4]?.trim() || null;
 
-        if (existingProduct) {
-          existingProduct.quantity += quantiteAjoutee;
-        } else {
-          db.data.products.push({
-            id: Date.now() + i,
-            name: nomProduit,
-            quantity: quantiteAjoutee,
-            createdAt: new Date().toISOString()
-          });
-        }
-        addedCount++;
-      }
+      if (!name) continue;
+
+      await query(
+        `INSERT INTO products (name, quantity, expiry_date, lot_number, barcode)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [name, quantity, expiry_date, lot_number, barcode]
+      );
+
+      addedCount++;
     }
-    await db.write();
 
-    console.log("CSV reçu et importé avec succès :", req.file.originalname);
-
-    res.status(200).json({
-      message: "Import CSV et enregistrement réussis !",
-      filename: req.file.originalname,
+    res.json({
+      message: 'Import CSV réussi',
       productsAdded: addedCount
     });
 
   } catch (error) {
-    console.error("Erreur import CSV :", error);
-    res.status(500).json({ message: "Erreur interne lors de l'import" });
+    console.error('Erreur import CSV:', error);
+    res.status(500).json({ message: 'Erreur lors de l\'import' });
   }
 });
 
-module.exports = router;
+export default router;

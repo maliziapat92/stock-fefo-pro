@@ -318,4 +318,174 @@ tr:hover td {
   font-size: 22px;
   color: #f1f5f9;
 }
-EOF
+
+/* ===== BOX 3D FEFO PREMIUM ===== */
+
+.box-3d {
+  width: 140px;
+  height: 140px;
+  perspective: 700px;
+  margin-left: 30px;
+  filter: drop-shadow(0 0 20px rgba(255,215,0,0.5));
+}
+
+.cube {
+  width: 110px;
+  height: 110px;
+  position: relative;
+  transform-style: preserve-3d;
+  animation: rotateBox 8s infinite linear, floatBox 3s infinite ease-in-out;
+  margin: auto;
+}
+
+.face {
+  position: absolute;
+  width: 110px;
+  height: 110px;
+  border: 2px solid #ffe066;
+  background: linear-gradient(135deg,#ffd700,#ff8c00);
+  box-shadow: inset 0 0 20px rgba(255,255,255,0.3);
+}
+
+.front {
+  transform: translateZ(55px);
+}
+
+.back {
+  transform: rotateY(180deg) translateZ(55px);
+}
+
+.right {
+  transform: rotateY(90deg) translateZ(55px);
+}
+
+.left {
+  transform: rotateY(-90deg) translateZ(55px);
+}
+
+.top {
+  transform: rotateX(90deg) translateZ(55px);
+}
+
+.bottom {
+  transform: rotateX(-90deg) translateZ(55px);
+}
+
+@keyframes rotateBox {
+  from {
+    transform: rotateX(-20deg) rotateY(0deg);
+  }
+  to {
+    transform: rotateX(-20deg) rotateY(360deg);
+  }
+}
+
+@keyframes floatBox {
+  0%,100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -12px;
+  }
+}
+
+@keyframes sonnette {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  25% {
+    transform: rotate(15deg);
+  }
+
+  50% {
+    transform: rotate(-15deg);
+  }
+
+  75% {
+    transform: rotate(10deg);
+  }
+
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+/* ===== LISTE DES PRODUITS ===== */
+
+.product-list{
+  margin-top:20px;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+
+.product-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  padding:14px;
+  background:#161b22;
+  border:1px solid #30363d;
+  border-radius:12px;
+  color:#f1f5f9;
+  flex-wrap:wrap;
+}
+
+.product-row button{
+  background:#dc2626;
+  color:#fff;
+  border:none;
+  border-radius:8px;
+  padding:8px 12px;
+  cursor:pointer;
+}
+
+.modal{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.65);
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  z-index:9999;
+}
+
+.modal-box{
+  width:min(500px,90%);
+  background:#161b22;
+  border:1px solid #30363d;
+  border-radius:16px;
+  padding:20px;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+
+.modal-box input{
+  width:100%;
+  padding:12px;
+  border-radius:10px;
+  border:1px solid #30363d;
+  background:#0f1115;
+  color:white;
+}
+
+.modal-box button{
+  padding:12px;
+  border:none;
+  border-radius:10px;
+  cursor:pointer;
+}
+
+.success-message{
+  position:fixed;
+  right:20px;
+  bottom:20px;
+  background:#16a34a;
+  color:#fff;
+  padding:12px 18px;
+  border-radius:10px;
+  z-index:10000;
+}

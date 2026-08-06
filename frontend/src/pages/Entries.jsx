@@ -1,110 +1,173 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 
 function Entries() {
-  const [period, setPeriod] = useState("day");
-  const [entriesData, setEntriesData] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [period, setPeriod] = useState("all");
   const [loading, setLoading] = useState(true);
 
-  // Charger les produits/entrées depuis l'API du dashboard
   useEffect(() => {
     fetch("http://localhost:5000/api/products")
       .then((res) => res.json())
       .then((data) => {
-        setEntriesData(Array.isArray(data) ? data : []);
+        setProducts(Array.isArray(data) ? data : []);
         setLoading(false);
       })
       .catch((err) => {
-        console.error("Erreur lors du chargement des entrées :", err);
+        console.error("Erreur chargement entrées :", err);
         setLoading(false);
       });
   }, []);
 
-  // Filtrage par période basé sur la date d'expiration ou un autre repère
-  const filteredData = entriesData.filter((item) => {
-    const targetDate = item.dateFabrication || item.dateExpiration;
-    if (!targetDate) return true;
-    const itemDate = new Date(targetDate);
+
+  const filteredProducts = products.filter((item) => {
+
+    if (period === "all") return true;
+
+    const date = new Date(item.created_at);
     const today = new Date();
 
+    const diff =
+      (today - date) /
+      (1000 * 60 * 60 * 24);
+
+
     if (period === "day") {
-      return itemDate.toDateString() === today.toDateString();
-    } else if (period === "week") {
-      const diffTime = Math.abs(today - itemDate);
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      return diffDays <= 7;
-    } else if (period === "month") {
+      return date.toDateString() === today.toDateString();
+    }
+
+    if (period === "week") {
+      return diff <= 7;
+    }
+
+    if (period === "month") {
       return (
-        itemDate.getMonth() === today.getMonth() &&
-        itemDate.getFullYear() === today.getFullYear()
+        date.getMonth() === today.getMonth() &&
+        date.getFullYear() === today.getFullYear()
       );
     }
+
     return true;
   });
 
+
   return (
-    <div className="page-container" style={{ padding: "20px", color: "white" }}>
-      <h2>📥 Historique des Entrées de Stock</h2>
-      <p style={{ color: "#aaa" }}>Consulte et filtre les entrées de marchandises par période.</p>
+    <div className="page-container" style={{padding:"20px",color:"white"}}>
 
-      {/* Boutons de filtrage par période */}
-      <div style={{ margin: "20px 0", display: "flex", gap: "10px" }}>
-        <button
-          onClick={() => setPeriod("day")}
-          style={{ padding: "8px 15px", background: period === "day" ? "#00ff88" : "#222", color: period === "day" ? "#000" : "#fff", border: "1px solid #333", cursor: "pointer", borderRadius: "8px", fontWeight: "bold" }}
-        >
-          Par Jour
-        </button>
-        <button
-          onClick={() => setPeriod("week")}
-          style={{ padding: "8px 15px", background: period === "week" ? "#00ff88" : "#222", color: period === "week" ? "#000" : "#fff", border: "1px solid #333", cursor: "pointer", borderRadius: "8px", fontWeight: "bold" }}
-        >
-          Par Semaine
-        </button>
-        <button
-          onClick={() => setPeriod("month")}
-          style={{ padding: "8px 15px", background: period === "month" ? "#00ff88" : "#222", color: period === "month" ? "#000" : "#fff", border: "1px solid #333", cursor: "pointer", borderRadius: "8px", fontWeight: "bold" }}
-        >
-          Par Mois
-        </button>
+      <h2>📥 Entrées de Stock</h2>
+
+      <p style={{color:"#aaa"}}>
+        Historique des produits ajoutés dans le stock.
+      </p>
+
+
+      <div style={{display:"flex",gap:10,margin:"20px 0"}}>
+
+        {[
+          ["all","Tout"],
+          ["day","Aujourd'hui"],
+          ["week","7 jours"],
+          ["month","Ce mois"]
+        ].map(([value,label]) => (
+
+          <button
+            key={value}
+            onClick={()=>setPeriod(value)}
+            style={{
+              padding:"8px 15px",
+              borderRadius:8,
+              border:"1px solid #333",
+              background:period===value?"#00ff88":"#222",
+              color:period===value?"#000":"white"
+            }}
+          >
+            {label}
+          </button>
+
+        ))}
+
       </div>
 
-      {/* Tableau d'affichage */}
-      <div style={{ overflowX: "auto" }}>
-        {loading ? (
-          <p>Chargement des entrées...</p>
-        ) : (
-          <table style={{ width: "100%", borderCollapse: "collapse", background: "#161616", borderRadius: "12px", overflow: "hidden" }}>
+
+      {loading ? (
+        <p>Chargement...</p>
+
+      ) : (
+
+        <div style={{overflowX:"auto"}}>
+
+          <table
+            style={{
+              width:"100%",
+              borderCollapse:"collapse",
+              background:"#161616"
+            }}
+          >
+
             <thead>
-              <tr style={{ background: "#222", textAlign: "left", borderBottom: "1px solid #333", color: "#aaa", fontSize: "12px" }}>
-                <th style={{ padding: "12px" }}>Nom du Produit</th>
-                <th style={{ padding: "12px" }}>Code-barres</th>
-                <th style={{ padding: "12px" }}>N° de Lot</th>
-                <th style={{ padding: "12px" }}>Quantité</th>
-                <th style={{ padding: "12px" }}>Péremption</th>
+
+              <tr style={{background:"#222"}}>
+                <th>Produit</th>
+                <th>Code-barres</th>
+                <th>Lot</th>
+                <th>Quantité</th>
+                <th>Fabrication</th>
+                <th>Expiration</th>
               </tr>
+
             </thead>
+
+
             <tbody>
-              {filteredData.length > 0 ? (
-                filteredData.map((item, index) => (
-                  <tr key={item.codeBarre || index} style={{ borderBottom: "1px solid #222" }}>
-                    <td style={{ padding: "12px", fontWeight: "bold" }}>{item.nom || "Produit"}</td>
-                    <td style={{ padding: "12px", color: "#aaa" }}>{item.codeBarre || "-"}</td>
-                    <td style={{ padding: "12px", color: "#aaa" }}>{item.numeroLot || "-"}</td>
-                    <td style={{ padding: "12px", fontWeight: "bold", color: "#00ff88" }}>+{item.quantite || 0}</td>
-                    <td style={{ padding: "12px" }}>{item.dateExpiration ? new Date(item.dateExpiration).toLocaleDateString() : "-"}</td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="5" style={{ padding: "20px", textAlign: "center", color: "#888" }}>
-                    Aucune entrée trouvée pour cette période.
+
+              {filteredProducts.map((item)=>(
+
+                <tr
+                  key={item.id}
+                  style={{borderBottom:"1px solid #333"}}
+                >
+
+                  <td>{item.name}</td>
+
+                  <td>
+                    {item.barcode || "-"}
                   </td>
+
+                  <td>
+                    {item.lot_number || "-"}
+                  </td>
+
+                  <td style={{color:"#00ff88"}}>
+                    +{item.quantity}
+                  </td>
+
+                  <td>
+                    {item.manufacture_date
+                    ? new Date(item.manufacture_date)
+                    .toLocaleDateString()
+                    : "-"
+                    }
+                  </td>
+
+                  <td>
+                    {item.expiry_date
+                    ? new Date(item.expiry_date)
+                    .toLocaleDateString()
+                    : "-"
+                    }
+                  </td>
+
                 </tr>
-              )}
+
+              ))}
+
             </tbody>
+
           </table>
-        )}
-      </div>
+
+        </div>
+
+      )}
+
     </div>
   );
 }

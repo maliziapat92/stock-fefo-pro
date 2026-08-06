@@ -5,7 +5,7 @@ import {
   TriangleAlert,
   ShieldCheck,
   ArrowLeftRight,
-  Layers,
+  Layers
 } from "lucide-react";
 
 import { NavLink } from "react-router-dom";
@@ -16,68 +16,103 @@ function Sidebar({ menuOpen, closeMenu }) {
     {
       name: "Dashboard",
       path: "/dashboard",
-      icon: <LayoutDashboard />,
+      icon: <LayoutDashboard />
     },
-
     {
       name: "Produits",
       path: "/products",
-      icon: <Package />,
+      icon: <Package />
     },
-
     {
-
-    name: "Entrée stock",
-
+      name: "Entrée stock",
       path: "/entries",
-      icon: <Boxes />,
+      icon: <Boxes />
     },
-
     {
       name: "Sorties stock",
       path: "/outputs",
-      icon: <ArrowLeftRight />,
+      icon: <ArrowLeftRight />
     },
-
-
     {
       name: "Alertes FEFO",
       path: "/alerts",
       icon: <TriangleAlert />,
-    },
-
-
-    {
-     name: "ADMIN",
-
-      path: "/admin",
-      icon: <ShieldCheck />,
-    },
+      badge: true
+    }
   ];
 
+
+  const adminMenu = [
+    {
+      name: "Administration",
+      path: "/admin",
+      icon: <ShieldCheck />
+    }
+  ];
+
+
+  const renderMenu = (items) =>
+    items.map((item,index)=>(
+      <NavLink
+        key={index}
+        to={item.path}
+        onClick={closeMenu}
+        className={({isActive}) =>
+          isActive
+          ? "sidebar-link active"
+          : "sidebar-link"
+        }
+      >
+
+        <span className="sidebar-icon">
+          {item.icon}
+        </span>
+
+        <span className="sidebar-text">
+          {item.name}
+        </span>
+
+        {item.badge && (
+          <span className="alert-badge">
+            !
+          </span>
+        )}
+
+      </NavLink>
+    ));
+
+
   return (
+
     <aside className={`sidebar ${menuOpen ? "open" : "closed"}`}>
-      <div className="sidebar-logo">GESTION FEFO 📦</div>
+
+      <div className="sidebar-logo">
+        📦 GESTION FEFO
+      </div>
+
 
       <nav>
-        {menu.map((item, index) => (
-          <NavLink
-            key={index}
 
-            to={item.path}
+        <div className="menu-title">
+          STOCK
+        </div>
 
-            onClick={closeMenu}
+        {renderMenu(menu)}
 
-            className="sidebar-link"
-          >
-            <span>{item.icon}</span>
 
-            {item.name}
-          </NavLink>
-        ))}
+        <div className="menu-title">
+          SYSTÈME
+        </div>
+
+        {renderMenu(adminMenu)}
+
       </nav>
+
     </aside>
+
   );
+
 }
+
 
 export default Sidebar;
