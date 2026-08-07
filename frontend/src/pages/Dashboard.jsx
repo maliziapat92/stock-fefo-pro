@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";import axios from "axios";
+import { useNavigate } from "react-router-dom";
 import {
   Package,
   Boxes,
@@ -14,11 +14,11 @@ import {
 } from "lucide-react";
 import BarcodeScanner from "react-qr-barcode-scanner";
 import "../App.css";
+import api from "../services/api";
 
 function Dashboard() {
-const API = "http://localhost:5000";
-  ;
-const navigate = useNavigate();
+  const navigate = useNavigate();
+
   // =====================
   // ETATS GENERAUX
   // =====================
@@ -42,23 +42,24 @@ const navigate = useNavigate();
     type: "",
     message: ""
   });
-const [nombreAlertes, setNombreAlertes] = useState(0);
-useEffect(() => {
-  const alertes = produits.filter((p) => {
-    if (!p.expiry_date) return false;
+  const [nombreAlertes, setNombreAlertes] = useState(0);
 
-    const date = new Date(p.expiry_date);
-    const aujourdHui = new Date();
+  useEffect(() => {
+    const alertes = produits.filter((p) => {
+      if (!p.expiry_date) return false;
 
-    const jours = Math.ceil(
-      (date - aujourdHui) / (1000 * 60 * 60 * 24)
-    );
+      const date = new Date(p.expiry_date);
+      const aujourdHui = new Date();
 
-    return jours < 30;
-  });
+      const jours = Math.ceil(
+        (date - aujourdHui) / (1000 * 60 * 60 * 24)
+      );
 
-  setNombreAlertes(alertes.length);
-}, [produits]);
+      return jours < 30;
+    });
+
+    setNombreAlertes(alertes.length);
+  }, [produits]);
 
   // =====================
   // FORMULAIRE AJOUT
@@ -98,16 +99,12 @@ useEffect(() => {
 
   const refreshData = async () => {
     try {
-      const products = await axios.get(
-        `${API}/api/products`
-      );
+      const products = await api.get("/products");
 
       setProduits(products.data);
 
       try {
-        const dashboard = await axios.get(
-          `${API}/api/dashboard`
-        );
+        const dashboard = await api.get("/dashboard");
 
         setStats(dashboard.data);
       } catch {
@@ -228,19 +225,15 @@ useEffect(() => {
     }
 
     try {
-      await axios.post(
-        `${API}/api/products`,
-        {
-          name,
-          barcode: barcode.trim() || null,
-          lot_number: lot_number || null,
-          manufacture_date: manufacture_date || null,
-
-          expiry_date: expiry_date || null,
-          quantity: Number(quantity) || 0,
-          price: Number(price) || null
-        }
-      );
+      await api.post("/products", {
+        name,
+        barcode: barcode.trim() || null,
+        lot_number: lot_number || null,
+        manufacture_date: manufacture_date || null,
+        expiry_date: expiry_date || null,
+        quantity: Number(quantity) || 0,
+        price: Number(price) || null
+      });
 
       setMessage(
         "✅ Produit enregistré avec succès"
@@ -253,13 +246,13 @@ useEffect(() => {
 
       setShowAddForm(false);
 
-setName("");
-setBarcode("");
-setLotNumber("");
-setManufactureDate("");
-setExpiryDate("");
-setQuantity("");
-setPrice("");
+      setName("");
+      setBarcode("");
+      setLotNumber("");
+      setManufactureDate("");
+      setExpiryDate("");
+      setQuantity("");
+      setPrice("");
       refreshData();
     } catch (error) {
       console.error(
@@ -285,9 +278,7 @@ setPrice("");
       return;
 
     try {
-      await axios.delete(
-        `${API}/api/products/${product.id}`
-      );
+      await api.delete(`/products/${product.id}`);
 
       showPopup(
         "success",
@@ -358,16 +349,12 @@ setPrice("");
     );
 
     try {
-      await axios.post(
-        `${API}/api/upload-csv`,
-        formData,
-        {
-          headers: {
-            "Content-Type":
-              "multipart/form-data"
-          }
+      await api.post("/upload-csv", formData, {
+        headers: {
+          "Content-Type":
+            "multipart/form-data"
         }
-      );
+      });
 
       showPopup(
         "success",
@@ -454,18 +441,18 @@ setPrice("");
           <FileSpreadsheet />
           CSV
         </button>
-<button
-  onClick={() => navigate("/entries")}
->
-  <Boxes />
-  Entrée
-</button>
-<button
-  onClick={() => navigate("/outputs")}
->
-  <ShoppingCart />
-  Sortie
-</button>
+        <button
+          onClick={() => navigate("/entries")}
+        >
+          <Boxes />
+          Entrée
+        </button>
+        <button
+          onClick={() => navigate("/outputs")}
+        >
+          <ShoppingCart />
+          Sortie
+        </button>
 
       </section>
 
@@ -537,7 +524,7 @@ setPrice("");
           if (jours < 0)
             statut = "🔴 EXPIRÉ";
           else if (jours < 30)
-            statut = "🟠 ALERTE";
+            statut = "⚠️ ALERTE";
 
           return (
             <div

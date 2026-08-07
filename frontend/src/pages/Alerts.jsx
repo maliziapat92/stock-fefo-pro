@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { TriangleAlert, Bell, BellOff } from "lucide-react";
-import axios from "axios";
+import api from "../services/api";
 
 function Alerts() {
   const [produits, setProduits] = useState([]);
@@ -9,7 +9,7 @@ function Alerts() {
 
   const chargerProduits = async () => {
     try {
-      const res = await axios.get("http://localhost:5000/api/products");
+      const res = await api.get("/products");
       setProduits(res.data);
     } catch (err) {
       console.error("Erreur chargement alertes :", err);

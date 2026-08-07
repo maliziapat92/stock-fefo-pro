@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import api from "../services/api";
 
 function Entries() {
   const [products, setProducts] = useState([]);
@@ -6,10 +7,9 @@ function Entries() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("http://localhost:5000/api/products")
-      .then((res) => res.json())
-      .then((data) => {
-        setProducts(Array.isArray(data) ? data : []);
+    api.get("/products")
+      .then((res) => {
+        setProducts(Array.isArray(res.data) ? res.data : []);
         setLoading(false);
       })
       .catch((err) => {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../services/api";
 
 function Products() {
   const [products, setProducts] = useState([]);
@@ -7,10 +7,7 @@ function Products() {
 
   const chargerProduits = async () => {
     try {
-      const response = await axios.get(
-        "http://localhost:5000/api/products"
-      );
-
+      const response = await api.get("/products");
       setProducts(response.data);
     } catch (error) {
       console.error("Erreur chargement produits :", error);

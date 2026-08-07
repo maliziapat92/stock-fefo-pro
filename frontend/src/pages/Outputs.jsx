@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import api from "../services/api";
 
 function Outputs() {
   const [history, setHistory] = useState([]);
@@ -6,10 +7,9 @@ function Outputs() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("http://localhost:5000/api/history")
-      .then((res) => res.json())
-      .then((data) => {
-        setHistory(Array.isArray(data) ? data : []);
+    api.get("/history")
+      .then((res) => {
+        setHistory(Array.isArray(res.data) ? res.data : []);
         setLoading(false);
       })
       .catch((err) => {
